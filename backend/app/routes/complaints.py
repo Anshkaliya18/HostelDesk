@@ -13,12 +13,15 @@ from fastapi import (
     Response,
     UploadFile,
     status,
+    Query,
 )
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_role
 from app.db.database import get_db
-from app.db.models import Complaint, User, UserRole
+from app.db.models import Complaint, ComplaintCategory, ComplaintStatus, Severity, User, UserRole
 from app.schemas.complaint import (
     AIRecommendationOut,
     ComplaintDetailOut,
@@ -34,9 +37,14 @@ logger = logging.getLogger(__name__)
 
 
 def _list_item(complaint: Complaint) -> ComplaintListItem:
+    student_brief = (
+        UserBrief.model_validate(complaint.student)
+        if complaint.student
+        else UserBrief(id=complaint.student_id, name="Student", role=UserRole.STUDENT)
+    )
     return ComplaintListItem(
         id=complaint.id,
-        student=UserBrief.model_validate(complaint.student),
+        student=student_brief,
         block=complaint.block,
         room=complaint.room,
         description=complaint.description,
@@ -49,7 +57,7 @@ def _list_item(complaint: Complaint) -> ComplaintListItem:
                 "worker_type": complaint.approved_worker.worker_type,
                 "name": complaint.approved_worker.user.name,
             }
-            if complaint.approved_worker
+            if complaint.approved_worker and complaint.approved_worker.user
             else None
         ),
         status=complaint.status,
@@ -67,7 +75,7 @@ def _detail(complaint: Complaint) -> ComplaintDetailOut:
         photo_available=bool(complaint.photo_storage_key),
         warden_note=complaint.warden_note,
         worker_note=complaint.worker_note,
-        history=[StatusHistoryItem.model_validate(h) for h in complaint.history],
+        history=[StatusHistoryItem.model_validate(h) for h in (complaint.history or [])],
         ai_recommendation=AIRecommendationOut.model_validate(recommendation) if recommendation else None,
     )
 
@@ -104,11 +112,34 @@ def submit_complaint(
 
 @router.get("", response_model=list[ComplaintListItem], summary="Warden complaint queue")
 def warden_queue(
+    status_filter: ComplaintStatus | None = Query(default=None, alias="status"),
+    category: ComplaintCategory | None = None,
+    severity: Severity | None = None,
+    search: str | None = Query(default=None, max_length=120),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|updated)$"),
     db: Session = Depends(get_db),
     warden: User = Depends(require_role(UserRole.WARDEN)),
 ) -> list[ComplaintListItem]:
     logger.info("Warden %s requested complaint queue", warden.id)
-    return [_list_item(c) for c in complaint_service.list_complaints(db)]
+    return [_list_item(c) for c in complaint_service.list_complaints(
+        db, status_filter=status_filter, category=category, severity=severity, search=search, sort=sort
+    )]
+
+
+@router.get("/mine", response_model=list[ComplaintListItem], summary="Complaints submitted by the signed-in Student")
+def my_complaints(db: Session = Depends(get_db),
+                  student: User = Depends(require_role(UserRole.STUDENT))) -> list[ComplaintListItem]:
+    rows = db.execute(
+        select(Complaint).where(Complaint.student_id == student.id)
+        .options(selectinload(Complaint.student))
+        .order_by(Complaint.created_at.desc())
+    ).scalars().all()
+    return [ComplaintListItem(
+        id=c.id, student=UserBrief.model_validate(c.student), block=c.block, room=c.room,
+        description=c.description, category=c.category, severity=c.severity,
+        ai_suggested_worker=c.ai_suggested_worker, approved_worker=None, status=c.status,
+        created_at=c.created_at, updated_at=c.updated_at, completed_at=c.completed_at,
+    ) for c in rows]
 
 
 @router.get("/{complaint_id}", response_model=ComplaintDetailOut, summary="Complaint detail (role-scoped)")

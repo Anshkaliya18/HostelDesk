@@ -8,7 +8,7 @@ import pytest
 
 from app.core.config import settings
 from app.utils import storage as storage_module
-from tests.conftest import jpeg_bytes, png_bytes
+from tests.conftest import auth_header, jpeg_bytes, png_bytes
 
 _KEY_PATTERN = r"complaints/\d+/[0-9a-f]{32}\.(?:jpg|png|webp)"
 
@@ -77,7 +77,7 @@ class TestLocalStorage:
         # The photo is still retrievable through the API.
         photo = client.get(
             f"/complaints/{complaint_id}/photo",
-            headers={"X-User-Id": str(users["warden"])},
+            headers=auth_header(users["warden"]),
         )
         assert photo.status_code == 200
 
@@ -247,7 +247,7 @@ class TestSupabaseStorage:
         created = _submit_with_photo(client, users).json()
         photo = client.get(
             f"/complaints/{created['id']}/photo",
-            headers={"X-User-Id": str(users["warden"])},
+            headers=auth_header(users["warden"]),
         )
         assert photo.status_code == 200
         assert photo.headers["Content-Type"] == "image/jpeg"

@@ -11,7 +11,7 @@ import sys
 from datetime import timedelta
 
 from app.core.config import settings
-from app.db.database import get_engine, SessionLocal
+from app.db.database import get_engine, SessionLocal, system_database_context
 from app.db.models import (
     AIRecommendation,
     Alert,
@@ -47,7 +47,7 @@ def seed(reset: bool) -> None:
     if reset:
         _reset(SessionLocal)
 
-    with SessionLocal() as db:
+    with SessionLocal() as db, system_database_context(db):
         if db.execute(select(User)).first() is not None:
             print("Database already seeded. Use --reset to drop and reseed.")
             return

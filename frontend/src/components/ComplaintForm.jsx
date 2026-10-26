@@ -26,7 +26,7 @@ function validateField(field, value) {
   return ''
 }
 
-export default function ComplaintForm({ onSuccess, autoFocusDescription = false }) {
+export default function ComplaintForm({ onSuccess, accessToken, autoFocusDescription = false }) {
   const [description, setDescription] = useState('')
   const [block, setBlock] = useState('')
   const [room, setRoom] = useState('')
@@ -167,6 +167,7 @@ export default function ComplaintForm({ onSuccess, autoFocusDescription = false 
         block: block.trim(),
         room: room.trim(),
         photo: photo?.file ?? null,
+        accessToken,
       })
 
       onSuccess(result)

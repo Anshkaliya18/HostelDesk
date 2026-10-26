@@ -3,6 +3,7 @@
 import os
 import shutil
 import tempfile
+import uuid
 from collections.abc import Callable, Iterator
 from datetime import timedelta
 from base64 import b64decode
@@ -34,6 +35,7 @@ from app.db.models import (  # noqa: E402
     WorkerType,
     utcnow,
 )
+from app.core import security  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -51,7 +53,29 @@ def jpeg_bytes() -> bytes:
 
 
 def auth_header(user_id: int | None) -> dict[str, str]:
-    return {"X-User-Id": str(user_id)}
+    return {"Authorization": f"Bearer test-user:{user_id}"}
+
+
+@pytest.fixture(autouse=True)
+def _stub_supabase_auth(monkeypatch):
+    """Keep API tests offline while exercising the Bearer-auth code path."""
+    def authenticate(token: str) -> dict:
+        if not token.startswith("test-user:"):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=401, detail="Invalid test session")
+        raw_id = token.split(":", 1)[1]
+        try:
+            auth_id = uuid.UUID(raw_id)
+        except ValueError:
+            auth_id = uuid.UUID(int=int(raw_id))
+        return {
+            "id": str(auth_id),
+            "email": f"test-{auth_id.int}@example.test",
+            "app_metadata": {},
+        }
+
+    monkeypatch.setattr(security, "get_supabase_auth_user", authenticate)
 
 
 @pytest.fixture(autouse=True)
@@ -93,6 +117,8 @@ def seed_users(db) -> Callable[[], dict[str, int]]:
         worker_user_two = User(name="Worker Two", role=UserRole.WORKER)
         db.add_all([student, warden, worker_user_one, worker_user_two])
         db.flush()
+        for user in (student, warden, worker_user_one, worker_user_two):
+            user.auth_user_id = uuid.UUID(int=user.id)
         electrician = Worker(user_id=worker_user_one.id, worker_type=WorkerType.ELECTRICIAN)
         plumber = Worker(user_id=worker_user_two.id, worker_type=WorkerType.PLUMBER)
         db.add_all([electrician, plumber])

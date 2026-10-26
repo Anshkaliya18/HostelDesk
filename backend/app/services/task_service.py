@@ -106,7 +106,7 @@ def get_task_for_worker(db: Session, user: User, task_id: int) -> Task:
 
 
 def complaint_worker(db: Session, user: User) -> Worker:
-    worker = db.execute(select(Worker).where(Worker.user_id == user.id)).scalar_one_or_none()
+    worker = db.execute(select(Worker).where(Worker.user_id == user.id)).scalars().first()
     if worker is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Worker profile not found.")
     return worker

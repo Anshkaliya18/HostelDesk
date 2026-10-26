@@ -2,8 +2,11 @@ import { useState } from 'react'
 import Header from './components/Header.jsx'
 import ComplaintForm from './components/ComplaintForm.jsx'
 import SuccessState from './components/SuccessState.jsx'
+import WardenApp from './pages/warden/WardenApp.jsx'
+import WorkerApp from './pages/worker/WorkerApp.jsx'
+import { RoleGate } from './pages/RoleApp.jsx'
 
-export default function App() {
+function StudentDashboard({ session, profile, onSignOut }) {
   const [submission, setSubmission] = useState(null)
   const [hasPreviousSubmission, setHasPreviousSubmission] = useState(false)
 
@@ -22,7 +25,7 @@ export default function App() {
         Skip to main content
       </a>
 
-      <Header />
+      <Header profile={profile} onSignOut={onSignOut} />
 
       <main className="main" id="main-content" tabIndex={-1}>
         <div className="container page-shell">
@@ -63,6 +66,7 @@ export default function App() {
                 />
               ) : (
                 <ComplaintForm
+                  accessToken={session.access_token}
                   onSuccess={handleSubmission}
                   autoFocusDescription={hasPreviousSubmission}
                 />
@@ -80,4 +84,11 @@ export default function App() {
       </footer>
     </div>
   )
+}
+
+export default function App() {
+  const path = window.location.pathname
+  if (path.startsWith('/warden')) return <WardenApp />
+  if (path.startsWith('/worker')) return <WorkerApp />
+  return <RoleGate role="student" dashboard={<StudentDashboard />} />
 }

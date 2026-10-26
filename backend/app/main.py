@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.routes import alerts, complaints, digest, tasks
+from app.routes import alerts, auth, complaints, digest, tasks, warden
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +36,9 @@ app.add_middleware(
     allow_headers=["X-User-Id", "Content-Type", "Accept", "Authorization"],
 )
 
+app.include_router(warden.router)
+app.include_router(auth.router)
+app.include_router(auth.role_router)
 app.include_router(complaints.router)
 app.include_router(tasks.router)
 app.include_router(alerts.router)
@@ -93,11 +96,12 @@ def root() -> dict[str, str]:
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Trim noisy validation payloads and drop internal file bodies."""
+    """Trim validation payloads and keep credentials out of error responses."""
     errors = exc.errors()
     cleaned = []
     for error in errors:
-        if isinstance(error.get("input"), object) and "photo" in str(error.get("loc", [])):
+        location = {str(part).lower() for part in error.get("loc", [])}
+        if "photo" in location or "password" in location:
             error.pop("input", None)
         cleaned.append(error)
     return JSONResponse(

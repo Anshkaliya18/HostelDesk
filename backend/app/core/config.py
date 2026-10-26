@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -17,10 +18,18 @@ class Settings(BaseSettings):
 
     # ---- Database ----
     database_url: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/hosteldesk"
+    migration_database_url: str = ""
+    application_db_role: str = "hosteldesk_app"
 
     # ---- Supabase (server-side only; never exposed to the frontend) ----
     supabase_url: str = ""
     supabase_service_role_key: str = ""
+    supabase_publishable_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+        ),
+    )
     supabase_storage_bucket: str = "complaint-photos"
     signed_url_expiry_seconds: int = 3600
 
@@ -58,6 +67,15 @@ class Settings(BaseSettings):
     def supabase_configured(self) -> bool:
         """True when a Supabase project is configured for Storage."""
         return bool(self.supabase_url and self.supabase_service_role_key)
+
+    @property
+    def supabase_auth_configured(self) -> bool:
+        return bool(self.supabase_url and self.supabase_publishable_key)
+
+    @property
+    def alembic_database_url(self) -> str:
+        """Prefer an owner-level URL for schema changes; runtime keeps DATABASE_URL."""
+        return self.migration_database_url or self.database_url
 
     @property
     def cors_origin_list(self) -> list[str]:

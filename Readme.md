@@ -253,7 +253,6 @@ Possible future extensions include:
 
 - Mobile application
 - Notifications
-- Real authentication
 - Hostel entry/exit management
 - Mess management
 - Attendance

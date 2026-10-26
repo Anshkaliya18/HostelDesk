@@ -155,9 +155,14 @@ async def process_complaint_ai(complaint_id: int, image: bytes | None, image_mim
       - exactly one AI analysis per complaint (idempotency guards below)
       - never overwrites a status the warden already moved forward
     """
-    from app.db.database import SessionLocal  # local import: avoids engine import at module load
+    from app.db.database import (
+        SessionLocal,
+        clear_database_security_context,
+        set_database_security_context,
+    )  # local import: avoids engine import at module load
 
     db = SessionLocal()
+    set_database_security_context(db, "SYSTEM")
     analysis_start = time.perf_counter()
     try:
         complaint = db.get(Complaint, complaint_id)
@@ -215,6 +220,7 @@ async def process_complaint_ai(complaint_id: int, image: bytes | None, image_mim
                 "[AI] complaint %s kept; warden can review it manually.", complaint_id
             )
     finally:
+        clear_database_security_context(db)
         db.close()
 
 
@@ -340,15 +346,28 @@ def get_complaint_scoped(db: Session, complaint_id: int, user: User) -> Complain
         return complaint
 
     if user.role == UserRole.WORKER:
-        worker = db.execute(select(Worker).where(Worker.user_id == user.id)).scalar_one_or_none()
+        worker = db.execute(select(Worker).where(Worker.user_id == user.id)).scalars().first()
         if worker is None or complaint.approved_worker_id != worker.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complaint not found.")
+        if complaint.student is None and complaint.student_id:
+            from app.db.database import set_database_security_context
+            set_database_security_context(db, "SYSTEM")
+            complaint.student = db.get(User, complaint.student_id)
+            set_database_security_context(db, "WORKER")
         return complaint
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role not supported here.")
 
 
-def list_complaints(db: Session) -> list[Complaint]:
+def list_complaints(
+    db: Session,
+    *,
+    status_filter: ComplaintStatus | None = None,
+    category: ComplaintCategory | None = None,
+    severity: Severity | None = None,
+    search: str | None = None,
+    sort: str = "newest",
+) -> list[Complaint]:
     """Warden-only complaint queue with the students/workers joined in."""
     stmt = (
         select(Complaint)
@@ -356,8 +375,27 @@ def list_complaints(db: Session) -> list[Complaint]:
             selectinload(Complaint.student),
             selectinload(Complaint.approved_worker).selectinload(Worker.user),
         )
-        .order_by(Complaint.created_at.desc())
     )
+    if status_filter is not None:
+        stmt = stmt.where(Complaint.status == status_filter)
+    if category is not None:
+        stmt = stmt.where(Complaint.category == category)
+    if severity is not None:
+        stmt = stmt.where(Complaint.severity == severity)
+    if search:
+        term = f"%{search.strip()}%"
+        stmt = stmt.join(Complaint.student).where(
+            Complaint.description.ilike(term)
+            | Complaint.block.ilike(term)
+            | Complaint.room.ilike(term)
+            | User.name.ilike(term)
+        )
+    ordering = {
+        "newest": Complaint.created_at.desc(),
+        "oldest": Complaint.created_at.asc(),
+        "updated": Complaint.updated_at.desc(),
+    }.get(sort, Complaint.created_at.desc())
+    stmt = stmt.order_by(ordering)
     return list(db.execute(stmt).scalars())
 
 

@@ -227,6 +227,17 @@ button:disabled {
   line-height: 1.2;
 }
 
+.student-signout {
+  margin-left: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
 /* ------------------------------------------------------------------
    4. Page layout
    ------------------------------------------------------------------ */

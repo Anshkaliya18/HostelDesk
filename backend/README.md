@@ -29,16 +29,23 @@ Copy-Item .env.example .env        # then edit DATABASE_URL / SUPABASE_* / GEMIN
 
 ### Supabase setup (once per project)
 
-1. Create the project, then run migrations against its PostgreSQL:
+1. Create the project, then run migrations against its PostgreSQL with an
+   owner-level connection. Keep the runtime API connection on the dedicated
+   `hosteldesk_app` role:
 
    ```powershell
-   # psql (Supabase Dashboard > SQL editor): CREATE DATABASE lookup not needed (postgres exists);
+   $env:MIGRATION_DATABASE_URL = "postgresql+psycopg2://postgres:<database-password>@db.<project-ref>.supabase.co:5432/postgres"
    .\.venv\Scripts\python.exe -m alembic upgrade head
+   Remove-Item Env:MIGRATION_DATABASE_URL
    ```
+
+   Get the direct connection string from Supabase Project Settings → Database.
 2. Create the **private** bucket in Dashboard > Storage > New bucket:
    name `complaint-photos`, Public = **off**.
-3. Fill `.env` with `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-   (both from Dashboard > Settings > API), keeping `SUPABASE_STORAGE_BUCKET=complaint-photos`.
+3. Fill `.env` with the runtime `DATABASE_URL`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY` (from Dashboard > Settings > API); keep
+   `SUPABASE_STORAGE_BUCKET=complaint-photos`. The service-role key stays on
+   the backend and is used for server-side account creation and private storage.
 4. Verify the wiring without starting the app:
 
    ```powershell
@@ -54,6 +61,12 @@ Copy-Item .env.example .env        # then edit DATABASE_URL / SUPABASE_* / GEMIN
    .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
    ```
 
+   Apply the Warden Auth/profile/RLS migration before starting the Warden portal:
+
+   ```powershell
+   .\.venv\Scripts\python.exe -m alembic upgrade head
+   ```
+
 Then open <http://127.0.0.1:8000/docs> (Swagger) or <http://127.0.0.1:8000/redoc>.
 `GET /health` now also reports database connectivity
 (`{"status":"ok","database":"connected"}`).
@@ -61,12 +74,20 @@ Then open <http://127.0.0.1:8000/docs> (Swagger) or <http://127.0.0.1:8000/redoc
 Until `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` are filled in, photo storage
 falls back to the local `uploads/` directory so development still works.
 
-## Demo authentication
+## Authentication
 
-For the MVP the API identifies users with the `X-User-Id` header (see
-`seed.py` output for demo ids: 1–2 students, 3 warden, 4–7 workers).
-`app/core/security.py` centralises the lookup, so swapping in JWT later only
-means replacing `get_current_user`.
+Students, Wardens, and Workers use the same Supabase Auth project. The backend
+verifies each access token and checks the linked database role. Profiles link
+to their Supabase account through `users.auth_user_id`.
+
+### Role signup
+
+Signup creates a confirmed Supabase Auth user and its HostelDesk role profile
+in one server request. It does not send an email or wait for a confirmation
+step. Student signup assigns only the Student role. Warden and Worker signup
+sets trusted `app_metadata` and links the account through `users.auth_user_id`;
+Worker signup also creates a row in the existing `workers` table. The service-role
+key is never embedded in frontend source.
 
 ## API overview
 
@@ -75,7 +96,15 @@ means replacing `get_current_user`.
 | GET | `/health` | public | health + database connectivity |
 | GET | `/` | public | welcome message |
 | POST | `/complaints` | student | submit complaint (multipart: `description`, `block`, `room`, optional `photo`) |
-| GET | `/complaints` | warden | full complaint queue |
+| GET | `/complaints` | warden | complaint queue; optional `status`, `category`, `severity`, `search`, and `sort` filters |
+| GET | `/auth/warden/me` | authenticated Warden | linked Warden profile |
+| GET | `/auth/me` | authenticated role | linked profile and role |
+| POST | `/auth/student/signup` | public | create confirmed Student account and profile |
+| POST | `/auth/warden/signup` | public | create confirmed Warden account and profile |
+| POST | `/auth/worker/signup` | public | create confirmed Worker account and profile |
+| GET | `/warden/dashboard` | warden | complaint totals, recent reports, and worker workload |
+| GET | `/warden/workers` | warden | worker availability and active task counts |
+| GET | `/warden/reports` | warden | status/category totals and daily digest |
 | GET | `/complaints/{id}` | owner / warden / assigned worker | role-scoped detail incl. status history |
 | GET | `/complaints/{id}/photo` | owner / warden / assigned worker | private photo bytes (no storage keys leaked) |
 | GET | `/complaints/{id}/photo/url` | owner / warden / assigned worker | temporary signed URL (Supabase Storage only) |
@@ -104,7 +133,8 @@ categorisation — by design.
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-53 tests cover health, complaint validation, student ownership, warden access,
+69 tests cover health, complaint validation, student ownership, Warden auth and
+access-code signup, Warden dashboard/workers/filters,
 worker task ownership, the warden review gate, worker completion, the
 repeat-problem rule, the digest, safe handling of invalid Gemini output,
 storage (validation, safe filenames, fake Supabase client, signed URLs),
