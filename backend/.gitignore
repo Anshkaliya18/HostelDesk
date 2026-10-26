@@ -1,0 +1,25 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+
+# Logs
+*.log
+
+# Uploaded images (private storage) - keep the folder tracked
+uploads/*
+!uploads/.gitkeep
+
+# Local scratch databases
+*.db
+*.sqlite

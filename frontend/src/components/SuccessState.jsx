@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { CheckIcon } from './Icons.jsx'
 
-export default function SuccessState({ reference, isPreview = false, onReset }) {
+export default function SuccessState({ reference, status = null, isPreview = false, onReset }) {
   const headingRef = useRef(null)
 
   useEffect(() => {
@@ -30,6 +30,13 @@ export default function SuccessState({ reference, isPreview = false, onReset }) 
             {reference ? `#${reference.replace(/^#/, '')}` : 'Pending'}
           </span>
         </div>
+
+        {status ? (
+          <p className="success-help">
+            Status: {status}. The warden reviews it next; the AI suggestion is prepared in the
+            background and never assigns a worker automatically.
+          </p>
+        ) : null}
 
         <p className="success-help">
           {reference

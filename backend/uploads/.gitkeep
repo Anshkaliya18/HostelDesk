@@ -1,0 +1,2 @@
+# Private image storage directory.
+# Anything committed here would be exposed, so the folder itself is kept empty.

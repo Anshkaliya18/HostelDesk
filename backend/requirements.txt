@@ -1,0 +1,24 @@
+# ---- Web framework ----
+fastapi>=0.115
+uvicorn[standard]>=0.32
+
+# ---- Database (Supabase PostgreSQL supported via DATABASE_URL) ----
+sqlalchemy>=2.0
+alembic>=1.13
+psycopg2-binary>=2.9
+
+# ---- Supabase (Storage for private complaint photos) ----
+supabase>=2.4
+
+# ---- Data validation / settings ----
+pydantic>=2.9
+pydantic-settings>=2.5
+
+# ---- File uploads ----
+python-multipart>=0.0.12
+
+# ---- Gemini API (HTTP) ----
+httpx>=0.27
+
+# ---- Tests ----
+pytest>=8.2

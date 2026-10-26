@@ -57,6 +57,7 @@ export default function App() {
               {submission ? (
                 <SuccessState
                   reference={submission.reference}
+                  status={submission.status}
                   isPreview={submission.isPreview}
                   onReset={handleReset}
                 />

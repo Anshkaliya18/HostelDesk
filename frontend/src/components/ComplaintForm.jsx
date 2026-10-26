@@ -5,15 +5,22 @@ import { preparePhoto, validatePhotoFile } from '../utils/image.js'
 import { submitComplaint } from '../services/complaints.js'
 
 const DESCRIPTION_MAX_LENGTH = 1000
-const ROOM_MAX_LENGTH = 120
+// Mirror the FastAPI Form() limits exactly, so the client can never build a
+// request the server is bound to reject with 422.
+const BLOCK_MAX_LENGTH = 40
+const ROOM_MAX_LENGTH = 60
 
 function validateField(field, value) {
   if (field === 'description') {
     return value.trim() ? '' : "Please describe what's wrong."
   }
 
+  if (field === 'block') {
+    return value.trim() ? '' : 'Add the block letter.'
+  }
+
   if (field === 'room') {
-    return value.trim() ? '' : 'Add the block and room number.'
+    return value.trim() ? '' : 'Add the room number.'
   }
 
   return ''
@@ -21,6 +28,7 @@ function validateField(field, value) {
 
 export default function ComplaintForm({ onSuccess, autoFocusDescription = false }) {
   const [description, setDescription] = useState('')
+  const [block, setBlock] = useState('')
   const [room, setRoom] = useState('')
   const [photo, setPhoto] = useState(null)
   const [photoError, setPhotoError] = useState('')
@@ -32,6 +40,7 @@ export default function ComplaintForm({ onSuccess, autoFocusDescription = false 
   const submittingRef = useRef(false)
   const photoUrlRef = useRef(null)
   const descriptionRef = useRef(null)
+  const blockRef = useRef(null)
   const roomRef = useRef(null)
 
   useEffect(() => {
@@ -69,13 +78,23 @@ export default function ComplaintForm({ onSuccess, autoFocusDescription = false 
     )
   }
 
+  function handleBlockChange(event) {
+    setBlock(event.target.value)
+    setErrors((current) => (current.block ? { ...current, block: '' } : current))
+  }
+
   function handleRoomChange(event) {
     setRoom(event.target.value)
     setErrors((current) => (current.room ? { ...current, room: '' } : current))
   }
 
   function handleBlur(field) {
-    const value = field === 'description' ? description : room
+    if (field === 'description') return handleBlurValue(field, description)
+    if (field === 'block') return handleBlurValue(field, block)
+    return handleBlurValue(field, room)
+  }
+
+  function handleBlurValue(field, value) {
     const message = validateField(field, value)
 
     setErrors((current) => {
@@ -121,14 +140,17 @@ export default function ComplaintForm({ onSuccess, autoFocusDescription = false 
 
     const nextErrors = {
       description: validateField('description', description),
+      block: validateField('block', block),
       room: validateField('room', room),
     }
     setErrors(nextErrors)
 
-    if (nextErrors.description || nextErrors.room) {
+    if (nextErrors.description || nextErrors.block || nextErrors.room) {
       window.requestAnimationFrame(() => {
         if (nextErrors.description) {
           descriptionRef.current?.focus()
+        } else if (nextErrors.block) {
+          blockRef.current?.focus()
         } else {
           roomRef.current?.focus()
         }
@@ -142,6 +164,7 @@ export default function ComplaintForm({ onSuccess, autoFocusDescription = false 
     try {
       const result = await submitComplaint({
         description: description.trim(),
+        block: block.trim(),
         room: room.trim(),
         photo: photo?.file ?? null,
       })
@@ -159,6 +182,10 @@ export default function ComplaintForm({ onSuccess, autoFocusDescription = false 
     'description-hint',
     errors.description ? 'description-error' : '',
   ]
+    .filter(Boolean)
+    .join(' ')
+
+  const blockDescribedBy = ['block-hint', errors.block ? 'block-error' : '']
     .filter(Boolean)
     .join(' ')
 
@@ -219,14 +246,48 @@ export default function ComplaintForm({ onSuccess, autoFocusDescription = false 
           </div>
 
           <div className="field">
+            <label className="field__label" htmlFor="block">
+              Block
+              <span className="required-mark" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <p className="field__hint" id="block-hint">
+              The block letter so we can route the complaint correctly.
+            </p>
+            <input
+              ref={blockRef}
+              className={`input${errors.block ? ' control--error' : ''}`}
+              id="block"
+              name="block"
+              type="text"
+              maxLength={BLOCK_MAX_LENGTH}
+              placeholder="A"
+              value={block}
+              required
+              autoComplete="off"
+              aria-invalid={Boolean(errors.block)}
+              aria-describedby={blockDescribedBy}
+              onChange={handleBlockChange}
+              onBlur={() => handleBlur('block')}
+            />
+            {errors.block ? (
+              <p className="field-error" id="block-error">
+                <AlertIcon size={15} />
+                <span>{errors.block}</span>
+              </p>
+            ) : null}
+          </div>
+
+          <div className="field">
             <label className="field__label" htmlFor="room">
-              Block / Room
+              Room
               <span className="required-mark" aria-hidden="true">
                 *
               </span>
             </label>
             <p className="field__hint" id="room-hint">
-              Include the block letter and room number so we can route it correctly.
+              The room number inside that block.
             </p>
             <input
               ref={roomRef}
@@ -235,7 +296,7 @@ export default function ComplaintForm({ onSuccess, autoFocusDescription = false 
               name="room"
               type="text"
               maxLength={ROOM_MAX_LENGTH}
-              placeholder="A Block - Room 204"
+              placeholder="204"
               value={room}
               required
               autoComplete="off"

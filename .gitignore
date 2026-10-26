@@ -42,5 +42,9 @@ htmlcov/
 *.sqlite
 *.sqlite3
 
-# Uploaded/local images
-uploads/
+# Uploaded/local images (private storage) - keep the folder tracked
+uploads/*
+!uploads/.gitkeep
+
+# Playwright MCP
+.playwright-mcp/
