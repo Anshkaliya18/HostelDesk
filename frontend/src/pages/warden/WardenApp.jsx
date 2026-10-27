@@ -166,7 +166,7 @@ export function DigestCard({ digest, compact = false, onOpenAlert, onOpenComplai
   </section>
 }
 
-function Dashboard() {
+function Dashboard({ onSelect }) {
   const { data, loading, error } = useLoad(getDashboard)
   const [digest, setDigest] = useState(null)
   const [digestError, setDigestError] = useState('')
@@ -183,7 +183,7 @@ function Dashboard() {
           <Metric label="High priority open" value={data.high_priority} tone="red" />
         </div>
         <div className="warden-columns">
-          <section className="warden-card"><h2>Recently submitted</h2><ComplaintTable complaints={data.recent} /></section>
+          <section className="warden-card"><h2>Recently submitted</h2><ComplaintTable complaints={data.recent} onSelect={onSelect} /></section>
           <section className="warden-card"><h2>Worker workload</h2><WorkerTable workers={data.workers} /></section>
         </div>
       </>}
@@ -466,7 +466,7 @@ function WardenWorkspace({ profile, onSignOut }) {
   return <div className="warden-app"><header className="warden-topbar"><a href="/warden/dashboard" onClick={e => { e.preventDefault(); navigate('/warden/dashboard') }} className="warden-brand"><span className="warden-brand-mark"><LogoIcon /></span><span>HostelDesk<small>WARDEN PORTAL</small></span></a><div className="warden-user"><span className="warden-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><span>{profile.name}<small>{profile.email}</small></span><button className="student-link" onClick={onSignOut}>Sign out</button></div></header>
     <div className="warden-layout"><aside className="warden-sidebar"><p className="warden-nav-label">WORKSPACE</p>{links.map(([href, label]) => <a key={href} className={route === href.split('/')[2] || (route === 'detail' && label === 'Complaints') ? 'active' : ''} href={href} onClick={e => { e.preventDefault(); navigate(href) }}><span className="nav-dot" />{label}</a>)}<div className="sidebar-hint"><strong>Review gate</strong><span>AI suggests. You decide.</span></div></aside>
       <main className="warden-main"><div className="warden-mobile-nav">{links.map(([href, label]) => <a key={href} href={href} onClick={e => { e.preventDefault(); navigate(href) }} className={route === href.split('/')[2] ? 'active' : ''}>{label}</a>)}</div>
-        {route === 'dashboard' && <Dashboard />}{route === 'complaints' && !detailId && <Complaints onSelect={id => navigate(`/warden/complaints/${id}`, id)} />}
+        {route === 'dashboard' && <Dashboard onSelect={id => navigate(`/warden/complaints/${id}`, id)} />}{route === 'complaints' && !detailId && <Complaints onSelect={id => navigate(`/warden/complaints/${id}`, id)} />}
         {route === 'detail' && <ComplaintDetail id={detailId} onBack={() => navigate('/warden/complaints')} onUpdated={() => { }} onOpen={dupId => navigate(`/warden/complaints/${dupId}`, dupId)} />}
         {route === 'workers' && <Workers />}{route === 'reports' && <Reports onOpenAlert={preset => navigate('/warden/complaints', null, preset)} onOpenComplaint={id => navigate(`/warden/complaints/${id}`, id)} />}
         {route === 'profile' && <><PageTitle title="Warden profile" subtitle="Your account details." /><section className="warden-card profile-card"><span className="profile-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><div><h2>{profile.name}</h2><p>{profile.email}</p><p>Role: {profile.role}</p><p>Account ID: {profile.id}</p></div></section></>}

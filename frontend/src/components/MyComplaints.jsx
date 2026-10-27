@@ -9,7 +9,7 @@ import {
 const POLL_INTERVAL_MS = 10_000
 
 const human = value => (value ? value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : 'Unclassified')
-const when = value => (value ? new Date(value).toLocaleString() : '—')
+const when = value => (value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
 function StatusBadge({ status }) {
   const kind = status === 'COMPLETED' ? 'done' : status === 'WARDEN_REVIEW' || status === 'SUBMITTED' ? 'wait' : 'active'
@@ -112,13 +112,14 @@ function Row({ item, onOpen }) {
     <li className="track-row">
       <button type="button" className="track-row__button" onClick={onOpen}>
         <span className="track-row__head">
-          <strong>#{item.id}</strong>
+          <span className="track-row__identity"><strong>Complaint #{item.id}</strong><small>{human(item.category)}</small></span>
           <StatusBadge status={item.status} />
         </span>
         <span className="track-row__meta">
-          {human(item.category)} · Block {item.block} / Room {item.room} · {human(item.severity)} · {when(item.created_at)}
+          <span>Block {item.block} · Room {item.room}</span><span>{human(item.severity)} priority</span><time dateTime={item.created_at}>{when(item.created_at)}</time>
         </span>
         <span className="track-row__desc">{item.description}</span>
+        <span className="track-row__action">View progress <span aria-hidden="true">→</span></span>
       </button>
     </li>
   )
@@ -163,18 +164,22 @@ export default function MyComplaints({ accessToken }) {
     return () => window.clearTimeout(pollRef.current)
   }, [load])
 
-  if (state.loading) return <p className="track-loading" role="status">Loading your complaints…</p>
-  if (state.error) return <div className="track-error" role="alert">{state.error}</div>
+  if (state.loading) return <div className="track-state" role="status"><span className="track-state__icon" aria-hidden="true">…</span><strong>Loading your reports</strong><span>Getting the latest updates from your hostel team.</span></div>
+  if (state.error) return <div className="track-state track-state--error" role="alert"><span className="track-state__icon" aria-hidden="true">!</span><strong>We couldn’t load your reports</strong><span>{state.error}</span><button type="button" className="track-retry" onClick={() => load()}>Try again</button></div>
   if (!state.items.length) {
     return (
-      <div className="track-empty">
-        <p>You have not reported anything yet.</p>
-        <p className="track-empty__help">Use the "Report a problem" tab to submit your first complaint.</p>
+      <div className="track-state track-empty">
+        <span className="track-state__icon" aria-hidden="true">＋</span>
+        <strong>No reports yet</strong>
+        <span>When you report a hostel issue, its progress will appear here.</span>
+        <p className="track-empty__help">Choose the <strong>Report a problem</strong> tab to get started.</p>
       </div>
     )
   }
 
   const open = state.items.find(item => item.id === state.openId)
+  const activeCount = state.items.filter(item => item.status !== 'COMPLETED').length
+  const resolvedCount = state.items.length - activeCount
 
   return (
     <div className="track">
@@ -182,12 +187,20 @@ export default function MyComplaints({ accessToken }) {
         <Detail id={open.id} accessToken={accessToken} onClose={() => setState(s => ({ ...s, openId: null }))} />
       ) : (
         <>
+          <header className="track-overview">
+            <div><p className="track-overview__eyebrow">YOUR REQUESTS</p><h3>Complaint tracking</h3><p>Follow updates and confirm when an issue is resolved.</p></div>
+            <div className="track-summary" aria-label={`${state.items.length} total complaints, ${activeCount} active, ${resolvedCount} resolved`}>
+              <span><strong>{state.items.length}</strong><small>Total</small></span>
+              <span><strong>{activeCount}</strong><small>In progress</small></span>
+              <span><strong>{resolvedCount}</strong><small>Resolved</small></span>
+            </div>
+          </header>
           <ul className="track-list">
             {state.items.map(item => (
               <Row key={item.id} item={item} onOpen={() => setState(s => ({ ...s, openId: item.id }))} />
             ))}
           </ul>
-          <p className="track-refresh">This list refreshes automatically while something is still open.</p>
+          <p className="track-refresh"><span className="track-live-dot" aria-hidden="true" />Updates automatically every few seconds while a report is active.</p>
         </>
       )}
     </div>
