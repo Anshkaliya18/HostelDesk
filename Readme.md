@@ -19,8 +19,8 @@ HostelDesk turns a hostel complaint **photo + one-line note** into a structured,
 
 1. A **Student** uploads a photo of the problem (broken fan, leaking tap…) with a short note
 2. **AI** analyzes the photo + text and suggests a **category**, **severity**, and **worker type**
-3. The **Warden** reviews the AI recommendation, edits if needed, and approves → a task is created
-4. The assigned **Worker** picks up the task, marks it in-progress, completes it with a note
+3. The **Warden** reviews the AI recommendation, edits if needed, and approves → a task is created .
+4. The assigned **Worker** picks up the task, marks it in-progress, completes it with a note .
 5. The **Student** sees live status updates end-to-end
 
 The warden also gets **repeat-problem alerts** and a **daily digest** — no AI required for those, just deterministic rules.
@@ -35,14 +35,14 @@ The warden also gets **repeat-problem alerts** and a **daily digest** — no AI 
 ### Student Portal
 - Photo upload (client-side validated, downsized to ≤1600px, re-encoded JPEG, metadata stripped)
 - One-line complaint description + block/room
-- Live complaint status tracking & history
+- Live complaint status tracking & history .
 
 ### Warden Portal
 - Complete complaint queue with filters (status / category / severity / search / sort)
 - AI-generated category, severity & suggested worker
 - **Approve or edit** AI recommendations before any assignment
 - Repeat-problem alerts (deterministic rule: same block + category recurring complaints)
-- Daily digest + worker workload overview
+- Daily digest + worker workload overview .
 
 ### Worker Portal
 - Assigned tasks, complaint details
@@ -134,7 +134,7 @@ Suggested demo walkthrough (one complaint, all three roles):
 
 ## Screenshots (from the live deployment)
 
-### Student portal
+### Student portal .
 
 | Login | Complaint submitted with photo |
 | --- | --- |
