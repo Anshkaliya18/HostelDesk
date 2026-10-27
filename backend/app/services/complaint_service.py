@@ -107,6 +107,16 @@ def create_complaint(
 
     if content is not None and extension is not None:
         upload_started = time.perf_counter()
+        # The photo key write runs in its own post-commit transaction, which
+        # the after_begin listener re-stamps with the *student's* RLS context.
+        # Students intentionally have no complaints UPDATE policy, so persist
+        # this trusted server-side result under the SYSTEM context (same
+        # pattern the background AI worker uses), then restore the request
+        # context for any follow-up reads in the same request.
+        from app.db.database import set_database_security_context  # local import: avoids engine import at module load
+
+        request_context = dict(db.info.get("hosteldesk_security_context") or {})
+        set_database_security_context(db, "SYSTEM")
         try:
             complaint.photo_storage_key = get_image_storage().save(
                 complaint.id, content, extension
@@ -120,7 +130,8 @@ def create_complaint(
         except StorageUnavailableError as exc:
             db.rollback()
             # The complaint itself is already durable; record the failure and
-            # keep it recoverable instead of deleting it.
+            # keep it recoverable instead of deleting it. Placeholders keep the
+            # photograph's history under the SYSTEM context.
             logger.error("Photo storage failed for complaint %s: %s", complaint.id, exc)
             complaint = db.get(Complaint, complaint.id)
             if complaint is not None:
@@ -137,6 +148,8 @@ def create_complaint(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Photo storage is temporarily unavailable. Please try again.",
             ) from exc
+        finally:
+            db.info["hosteldesk_security_context"] = request_context
 
     logger.info(
         "[Complaint] response ready: complaint %s in %.2fs (AI runs in background)",

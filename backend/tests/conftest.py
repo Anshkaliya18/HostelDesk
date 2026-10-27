@@ -19,6 +19,10 @@ os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "sqlite://")
 os.environ["SUPABASE_URL"] = ""
 os.environ["SUPABASE_SERVICE_ROLE_KEY"] = ""
 os.environ["GEMINI_API_KEY"] = ""
+# Force the exact model names the AI tests assert on; the real backend/.env
+# may carry a different working model (e.g. gemini-2.5-flash).
+os.environ["GEMINI_MODEL"] = "gemma-4-31b-it"
+os.environ["GEMINI_FALLBACK_MODEL"] = "gemma-4-26b-a4b-it"
 _TEST_UPLOAD_DIR = Path(tempfile.mkdtemp(prefix="hosteldesk-test-uploads-"))
 os.environ["UPLOAD_DIR"] = str(_TEST_UPLOAD_DIR)
 
