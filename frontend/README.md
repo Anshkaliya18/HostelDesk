@@ -39,7 +39,26 @@ The app creates confirmed users through the backend Admin API, so signup does no
 
 ## Production deployment
 
-Build the frontend with `npm run build` and publish `dist/`. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_API_BASE_URL` in the frontend host. The API base URL should be the deployed FastAPI origin when the frontend and API use separate hosts. Configure the static host to serve `index.html` for direct browser requests to `/student/*`, `/warden/*`, and `/worker/*` so role routes work after refresh. Set the backend `CORS_ORIGINS` to the exact deployed frontend origin.
+The production frontend is deployed at **https://hosteldesk.aurio.workers.dev** (Cloudflare Workers static assets).
+
+Build and deploy:
+
+```bash
+npm run build
+npx wrangler deploy
+```
+
+`wrangler.jsonc` configures the Worker (`hosteldesk`) with `dist/` as the assets directory and single-page-application fallback, so `/student/*`, `/warden/*`, and `/worker/*` routes work after refresh.
+
+`wrangler.jsonc` and `dist/` only — the build-time variables below must be set before building:
+
+```env
+VITE_SUPABASE_URL=https://xlhwsuvzcunxschpupdm.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key>
+VITE_API_BASE_URL=https://hosteldesk-qgx8.onrender.com
+```
+
+They are compiled into the bundle at build time — if any are missing, `createClient` returns `null` and the portal shows "Authentication is not configured." The API base URL is the deployed FastAPI origin on Render. The publishable key is public by design; never put a service-role key in frontend variables. The backend `CORS_ORIGINS` on Render must include the exact deployed frontend origin (`https://hosteldesk.aurio.workers.dev`).
 
 ## Checks
 

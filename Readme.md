@@ -1,290 +1,264 @@
-# HostelDesk
+# 🛏️ HostelDesk
 
-> AI-assisted hostel complaint and task desk.
+> **AI-assisted hostel complaint & maintenance desk — AI suggests, the Warden decides.**
 
-HostelDesk turns a hostel complaint photo and a short description into a structured, trackable task.
+🌐 **[Live Demo → https://hosteldesk.aurio.workers.dev](https://hosteldesk.aurio.workers.dev/)**
 
-A student uploads a photo and one-line note. AI analyzes the complaint and suggests a category, severity, and worker. The warden reviews and approves or edits the recommendation, and the assigned worker can view and complete the task.
+| Deployment | URL | Status |
+| --- | --- | --- |
+| **Frontend (Student / Warden / Worker portals)** | [hosteldesk.aurio.workers.dev](https://hosteldesk.aurio.workers.dev/) | 🟢 Live on Cloudflare Workers |
+| **Backend API (FastAPI)** | [hosteldesk-qgx8.onrender.com](https://hosteldesk-qgx8.onrender.com/) | 🟢 Live on Render |
+| **API Docs (Swagger)** | [hosteldesk-qgx8.onrender.com/docs](https://hosteldesk-qgx8.onrender.com/docs) | 🟢 Live |
+| **Database & Auth & Storage** | Supabase (PostgreSQL + Auth + private Storage bucket) | 🟢 Live |
 
-## Problem
+---
 
-Hostel complaints are often reported through WhatsApp messages or verbal requests. This makes it difficult to know:
+## 🎬 What it does
 
-- What complaints are still open
-- Which complaints are overdue
-- Who is responsible for fixing an issue
-- Which problems keep repeating in the same block
+HostelDesk turns a hostel complaint **photo + one-line note** into a structured, trackable maintenance task:
 
-## Solution
+1. 📸 A **Student** uploads a photo of the problem (broken fan, leaking tap…) with a short note
+2. 🤖 **AI** analyzes the photo + text and suggests a **category**, **severity**, and **worker type**
+3. 🧑‍💼 The **Warden** reviews the AI recommendation, edits if needed, and approves → a task is created
+4. 🔧 The assigned **Worker** picks up the task, marks it in-progress, completes it with a note
+5. 📱 The **Student** sees live status updates end-to-end
 
-HostelDesk provides a simple complaint workflow:
+The warden also gets **repeat-problem alerts** and a **daily digest** — no AI required for those, just deterministic rules.
 
-```text
-Student
-   ↓
-Photo + Note
-   ↓
-AI Analysis
-   ↓
-Warden Review
-   ↓
-Worker Assignment
-   ↓
-Task Completion
-   ↓
-Student Status
-```
+> ### The core principle
+> **AI suggests; the Warden decides.** The model never assigns a worker or decides about students — the warden's review creates the task.
 
-The core principle is:
+---
 
-> **AI suggests; the Warden decides.**
+## 🧩 Key Features
 
-The AI does not make decisions about students.
+### Student Portal
+- Photo upload (client-side validated, downsized to ≤1600px, re-encoded JPEG, metadata stripped)
+- One-line complaint description + block/room
+- Live complaint status tracking & history
 
-## Key Features
+### Warden Portal
+- Complete complaint queue with filters (status / category / severity / search / sort)
+- AI-generated category, severity & suggested worker
+- **Approve or edit** AI recommendations before any assignment
+- Repeat-problem alerts (deterministic rule: same block + category recurring complaints)
+- Daily digest + worker workload overview
 
-### Student
+### Worker Portal
+- Assigned tasks, complaint details
+- ASSIGNED → IN_PROGRESS → COMPLETED workflow with completion notes
 
-- Upload a complaint photo
-- Add a short description
-- Submit a complaint
-- Track complaint status
-- View own complaints
+### AI Engine (Gemini / Gemma, server-side only)
+- Categories: **Electrical · Plumbing · Cleaning · Furniture**
+- Severity: **Low · Medium · High**
+- Worker suggestions: **Electrician · Plumber · Cleaner · Carpenter**
+- Graceful fallback: if AI is unavailable, the complaint lands directly in `WARDEN_REVIEW` for manual categorization — the flow never blocks
 
-### Warden
+---
 
-- View complaint queue
-- See AI-generated category and severity
-- Review suggested worker
-- Approve or edit AI recommendations
-- View repeat-problem alerts
-- View daily complaint digest
-
-### Worker
-
-- View assigned tasks
-- See complaint details
-- Mark a task in progress
-- Mark a task completed
-- Add a completion note
-
-### AI
-
-The AI analyzes the complaint photo and text and suggests:
-
-- Category
-- Severity
-- Worker type
-
-Supported complaint categories:
-
-- Electrical
-- Plumbing
-- Cleaning
-- Furniture
-
-## Architecture
+## 🔄 Complaint Lifecycle
 
 ```text
-                    HostelDesk Web App
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-           Student       Warden       Worker
-              │            │            │
-              └────────────┼────────────┘
-                           │
-                       Backend API
-                           │
-                ┌──────────┴──────────┐
-                │                     │
-             Database              AI Service
-                                      │
-                                 Gemini API
+SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COMPLETED
 ```
 
-## Complaint Lifecycle
+---
+
+## 🏗️ Architecture
 
 ```text
-SUBMITTED
-    ↓
-AI_ANALYZED
-    ↓
-WARDEN_REVIEW
-    ↓
-ASSIGNED
-    ↓
-IN_PROGRESS
-    ↓
-COMPLETED
+              https://hosteldesk.aurio.workers.dev
+              Student  ·  Warden  ·  Worker (React SPA)
+                            │ HTTPS
+                            ▼
+              https://hosteldesk-qgx8.onrender.com
+              FastAPI (auth, complaints, tasks, digest)
+               │            │              │
+               ▼            ▼              ▼
+      Supabase Auth   Supabase Postgres   Gemini/Gemma API
+      (email+token)   (RLS-protected)     (classification)
+               │            │
+               ▼            ▼
+      Private Storage  Alembic migrations
+      (complaint photos)
 ```
 
-## Tech Stack
+**Security model:**
+- Photos are stored in a **private** Supabase Storage bucket; the DB keeps only the storage key
+- The **service-role key never leaves the backend** — the browser only uses the public publishable key
+- Row-Level Security policies on every table; a dedicated non-owner `hosteldesk_app` DB role runs the API
+- All AI calls happen server-side; no AI keys in frontend code
 
-- Frontend: React
-- Backend: FastAPI
-- Database: PostgreSQL
-- AI: Gemini API / Gemma 4
-- Version Control: Git + GitHub
+---
 
-## Project Structure
+## 🛠️ Tech Stack
+
+| Layer | Tech |
+| --- | --- |
+| Frontend | React 19 · Vite · plain CSS |
+| Backend | Python 3.11 · FastAPI · SQLAlchemy 2.x · Pydantic v2 · Alembic |
+| Database | Supabase PostgreSQL (with RLS) |
+| Auth | Supabase Auth (role-based signup: Student / Warden / Worker) |
+| Storage | Supabase Storage — private `complaint-photos` bucket |
+| AI | Gemini API (Gemma models, free-tier, server-side REST) |
+| Hosting | Cloudflare Workers (frontend static assets) · Render (backend) |
+| Tests | pytest — 69 backend tests |
+
+---
+
+## 🧪 Try the live demo
+
+**Sign up directly on the live site** — registration is a single step (choose a role → name, email, password → dashboard opens). No email confirmation needed.
+
+Suggested demo walkthrough (one complaint, all three roles):
+
+```text
+1. Sign up as Student      → upload a photo of a broken fan + short note
+2. Sign up as Warden       → see the complaint AI-tagged ELECTRICAL / HIGH / Electrician → approve
+3. Sign up as Worker       → electrician sees the task → mark In Progress → Complete with note
+4. Back in the Student tab → status shows COMPLETED
+5. Warden                  → check repeat-problem alerts + daily digest
+```
+
+> 💡 Open the three roles in separate browser tabs/incognito windows for the smoothest demo.
+
+---
+
+## 📂 Project Structure
 
 ```text
 HostelDesk/
 │
-├── frontend/
-│   └── React application
+├── frontend/            # React app (all three role portals)
+│   ├── src/pages/       #   Student / Warden / Worker screens
+│   ├── src/services/    #   Supabase + API clients
+│   ├── wrangler.jsonc   #   Cloudflare Workers static-assets deploy
+│   └── .env.example     #   Vite build-time environment template
 │
-├── backend/
-│   └── FastAPI application
+├── backend/             # FastAPI service
+│   ├── app/             #   routes, services, schemas, db, core
+│   ├── alembic/         #   DB migrations (incl. RLS policy migration)
+│   ├── tests/           #   69 pytest tests
+│   ├── seed.py          #   demo data seeder
+│   └── .env.example     #   full backend environment template
 │
-├── README.md
-├── LICENSE
-└── .gitignore
+├── Readme.md            # this file
+└── LICENSE              # MIT
 ```
 
-## Getting Started
+---
 
-### 1. Clone the repository
+## 🚀 Run it locally
 
-```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd HostelDesk
-```
-
-### 2. Start the backend
+### 1. Backend (FastAPI)
 
 ```bash
 cd backend
-```
-
-Create a virtual environment:
-
-```bash
-python -m venv venv
-```
-
-Activate it.
-
-Windows:
-
-```bash
-venv\Scripts\activate
-```
-
-macOS/Linux:
-
-```bash
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate   |   macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
+copy .env.example .env              # then fill in your keys (see below)
+
+python -m alembic upgrade head      # create tables
+python seed.py                      # optional demo data
+uvicorn app.main:app --reload --port 8000
 ```
 
-Start the server:
+Swagger UI: <http://127.0.0.1:8000/docs>
 
-```bash
-uvicorn main:app --reload
-```
+> Without `GEMINI_API_KEY` or Supabase keys the app still runs: AI is skipped (complaints go straight to warden review) and photos fall back to the local `uploads/` folder.
 
-### 3. Start the frontend
-
-Open another terminal:
+### 2. Frontend (Vite)
 
 ```bash
 cd frontend
 npm install
+copy .env.example .env.local        # then fill in the three VITE_ vars
 npm run dev
 ```
 
-## Environment Variables
+The dev proxy forwards API calls to `127.0.0.1:8000`.
 
-Create a `.env` file in the backend.
+---
 
-Example:
+## 🔐 Environment Variables
+
+Full templates with comments live in [`backend/.env.example`](backend/.env.example) and [`frontend/.env.example`](frontend/.env.example).
+
+**Backend (`backend/.env`) — essentials:**
 
 ```env
-GEMINI_API_KEY=your_api_key_here
-DATABASE_URL=your_database_url_here
+DATABASE_URL=postgresql+psycopg2://<role>:<password>@<host>:5432/postgres
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<server-side only — never in the browser>
+GEMINI_API_KEY=<google ai studio key>
+CORS_ORIGINS=http://localhost:5173,https://hosteldesk.aurio.workers.dev
 ```
 
-**Never commit API keys or real student data to GitHub.**
+**Frontend (`frontend/.env.local`) — all three build-time vars are required:**
 
-## Development Branches
-
-We use separate branches for each major workstream:
-
-```text
-main
-feature/student
-feature/warden-ai
-feature/backend-worker
+```env
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<public publishable key>
+VITE_API_BASE_URL=https://hosteldesk-qgx8.onrender.com
 ```
 
-### Branch ownership
+> ⚠️ **Never** commit real `.env` files, put the service-role key in frontend code, or upload real student records.
 
-| Branch | Owner | Responsibility |
-|---|---|---|
-| `feature/student` | Team Lead | Student UI and complaint flow |
-| `feature/warden-ai` | Member 2 | AI integration and Warden dashboard |
-| `feature/backend-worker` | Member 3 | Backend, database, Worker workflow and insights |
+---
 
-The `main` branch contains the integrated version of the project.
+## ☁️ Deployment (how this repo is hosted)
 
-## MVP Scope
+- **Frontend → Cloudflare Workers** (static assets, SPA fallback so `/warden/*` routes survive refresh):
+  ```bash
+  cd frontend
+  npm run build
+  npx wrangler deploy
+  ```
+- **Backend → Render**: FastAPI web service; set the env vars above in the Render dashboard (note `CORS_ORIGINS` must include the exact Cloudflare frontend origin).
+- **Database/Auth/Storage → Supabase**: run Alembic migrations with the migration connection string, create the private `complaint-photos` bucket.
 
-The MVP focuses on:
+---
 
-- Student complaint submission
-- Photo + text AI analysis
-- Warden review and approval
-- Worker task assignment
-- Task completion
-- Student status tracking
-- Repeat-problem alerts
-- Daily warden digest
+## 🧪 Tests
 
-## Future Work
-
-Possible future extensions include:
-
-- Mobile application
-- Notifications
-- Hostel entry/exit management
-- Mess management
-- Attendance
-- Fee management
-
-## Demo Flow
-
-The main demonstration follows one complaint:
-
-```text
-1. Student uploads a photo of a broken fan
-2. Student adds a short description
-3. AI identifies the issue as electrical
-4. AI suggests high severity and an electrician
-5. Warden reviews and approves the recommendation
-6. Worker receives the assigned task
-7. Worker marks the task completed
-8. Student sees the updated status
-9. Warden sees repeat-problem alerts and the daily digest
+```bash
+cd backend
+python -m pytest -q
 ```
 
-## Privacy and Security
+69 tests cover health, complaint validation & ownership, role-based auth and access-code warden signup, warden dashboard/filters, worker task ownership, the warden review gate, repeat-problem alerts, digest, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
 
-This project is a hackathon MVP.
+---
 
-- Use fake/demo student data
-- Keep API keys server-side
-- Do not commit `.env` files
-- Do not commit real student records
-- Validate AI input and output
-- Keep the Warden in the decision loop
+## 🌱 MVP Scope & What's Next
 
-## License
+**In the MVP:** student submission with photo, AI classification (photo + text), warden review gate, worker assignment & completion, student status tracking, repeat-problem alerts, daily digest.
 
-This project is released under the MIT License.
+**Future work:** push notifications · mobile app · hostel entry/exit · mess · attendance · fee management.
+
+---
+
+## 🗂️ Branches
+
+This repo was built with separate workstream branches, now merged into `main`:
+
+| Branch | Focus |
+| --- | --- |
+| `main` | integrated MVP (current) |
+| `feature/student` | student UI + complaint flow |
+| `feature/warden-ai` | AI integration + warden dashboard |
+| `feature/backend-worker` | backend, database, worker workflow, insights |
+
+---
+
+## 🔒 Privacy & Security Notes
+
+- Use fake/demo data only
+- All API keys stay server-side (backend `.env` / Render env vars)
+- AI input/output is validated; the warden stays in the decision loop
+- Strict file validation on every photo upload
+
+## 📄 License
+
+MIT — see [`LICENSE`](LICENSE).
