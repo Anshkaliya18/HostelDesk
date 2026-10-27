@@ -1,12 +1,14 @@
 """Supabase account creation and server-managed role profiles."""
 
+import hmac
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core import security
+from app.core.config import settings
 from app.core.security import get_current_user, require_bearer_auth, require_role
 from app.db.database import (
     get_db,
@@ -20,6 +22,7 @@ from app.schemas.auth import (
     WardenSignup,
     WorkerSignup,
 )
+from app.utils.rate_limit import client_ip, signup_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth/warden", tags=["Warden Auth"])
@@ -44,6 +47,20 @@ def current_profile(
     user: User = Depends(get_current_user),
 ) -> ProfileOut:
     return _profile(user, auth_user.get("email", ""))
+
+
+def _check_staff_invite_code(invite_code: str) -> None:
+    """Gate Warden/Worker signup behind the server-side invite code.
+
+    The code lives only in the backend environment (STAFF_INVITE_CODE). When it
+    is unset, staff signup is disabled entirely. Comparison is constant-time.
+    """
+    expected = settings.staff_invite_code
+    if not expected:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff signup is disabled.")
+    supplied = (invite_code or "").strip()
+    if not supplied or not hmac.compare_digest(supplied.encode(), expected.encode()):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "A valid staff invite code is required.")
 
 
 def _create_account(
@@ -104,8 +121,22 @@ def _create_account(
     return _profile(user, email)
 
 
+def _check_signup_rate_limit(request: Request) -> None:
+    """Max 10 signups per hour per client IP (X-Forwarded-For first hop)."""
+    from app.core.config import get_settings
+
+    if not signup_limiter.check(
+        f"signup:{client_ip(request)}", get_settings().signup_rate_limit_hourly, 3600
+    ):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many sign-up attempts right now. Please try again in an hour.",
+        )
+
+
 @role_router.post("/student/signup", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
-def student_signup(payload: StudentSignup, db: Session = Depends(get_db)) -> ProfileOut:
+def student_signup(payload: StudentSignup, request: Request, db: Session = Depends(get_db)) -> ProfileOut:
+    _check_signup_rate_limit(request)
     return _create_account(
         db,
         email=payload.email.strip().casefold(),
@@ -116,7 +147,9 @@ def student_signup(payload: StudentSignup, db: Session = Depends(get_db)) -> Pro
 
 
 @role_router.post("/warden/signup", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
-def warden_signup(payload: WardenSignup, db: Session = Depends(get_db)) -> ProfileOut:
+def warden_signup(payload: WardenSignup, request: Request, db: Session = Depends(get_db)) -> ProfileOut:
+    _check_signup_rate_limit(request)
+    _check_staff_invite_code(payload.invite_code)
     return _create_account(
         db,
         email=payload.email.strip().casefold(),
@@ -127,7 +160,9 @@ def warden_signup(payload: WardenSignup, db: Session = Depends(get_db)) -> Profi
 
 
 @role_router.post("/worker/signup", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
-def worker_signup(payload: WorkerSignup, db: Session = Depends(get_db)) -> ProfileOut:
+def worker_signup(payload: WorkerSignup, request: Request, db: Session = Depends(get_db)) -> ProfileOut:
+    _check_signup_rate_limit(request)
+    _check_staff_invite_code(payload.invite_code)
     return _create_account(
         db,
         email=payload.email.strip().casefold(),

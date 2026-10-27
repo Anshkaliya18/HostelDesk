@@ -33,11 +33,14 @@ class Settings(BaseSettings):
     supabase_storage_bucket: str = "complaint-photos"
     signed_url_expiry_seconds: int = 3600
 
-    # ---- Gemini / Gemma ----
+    # ---- Gemini ----
     gemini_api_key: str = ""
-    gemini_model: str = "gemma-4-31b-it"
-    gemini_fallback_model: str = "gemma-4-26b-a4b-it"
-    # Short timeout: Gemma 4 classification is a small JSON task. If the model
+    # Default: Gemini 2.5 Flash (fallback: 2.5 Flash-Lite) through the Google
+    # Generative Language API. Gemma 4 is a single env-var swap once Google
+    # API keys expose it (e.g. GEMINI_MODEL=gemma-4-31b-it).
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_fallback_model: str = "gemini-2.5-flash-lite"
+    # Short timeout: classification is a small JSON task. If the model
     # doesn't answer within this, AI is marked failed and the complaint stays
     # in WARDEN_REVIEW for manual review. Configurable per deployment.
     ai_request_timeout_seconds: int = 10
@@ -54,8 +57,28 @@ class Settings(BaseSettings):
     # ---- CORS ----
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # ---- Staff signup ----
+    # STAFF_INVITE_CODE gates Warden/Worker signup. When empty, staff signup is
+    # disabled entirely (403). Student signup stays open.
+    staff_invite_code: str = ""
+
+    # ---- Abuse limits (in-memory sliding window; per process) ----
+    complaint_rate_limit_10min: int = 5
+    complaint_rate_limit_daily: int = 20
+    signup_rate_limit_hourly: int = 10
+
     # ---- Rules ----
     task_overdue_hours: int = 24
+    # Severity-based SLA (falls back to task_overdue_hours when unset).
+    task_overdue_hours_high: int = 4
+    task_overdue_hours_medium: int = 24
+    task_overdue_hours_low: int = 72
+    # Complaints waiting for warden review longer than this count as stale in
+    # the daily digest.
+    stale_review_hours: int = 4
+    # Optional digest polish with one Gemini text call (rules output is the
+    # always-on baseline). Counters only - never student names or photos.
+    digest_ai_polish: bool = True
     repeat_problem_window_days: int = 7
     repeat_problem_threshold: int = 3
 

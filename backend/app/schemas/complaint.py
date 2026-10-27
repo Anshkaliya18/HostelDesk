@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models import (
     ComplaintCategory,
@@ -32,6 +32,11 @@ class AIRecommendationOut(BaseModel):
     category: ComplaintCategory | None
     severity: Severity | None
     suggested_worker: WorkerType | None
+    reason: str | None = None
+    confidence: str | None = None
+    safety_flag: bool | None = None
+    duplicate_of_complaint_id: int | None = None
+    model: str | None = None
     raw_response: dict | None
     created_at: datetime
 
@@ -55,6 +60,10 @@ class ReviewRequest(BaseModel):
     warden_note: str | None = None
 
 
+class ReopenRequest(BaseModel):
+    reason: str = Field(min_length=5, max_length=300)
+
+
 class ComplaintListItem(BaseModel):
     id: int
     student: UserBrief
@@ -69,6 +78,10 @@ class ComplaintListItem(BaseModel):
     created_at: datetime
     updated_at: datetime | None
     completed_at: datetime | None
+    # Latest AI recommendation summary for the warden queue (optional so old
+    # rows and student endpoints without a recommendation still serialize).
+    ai_confidence: str | None = None
+    ai_safety_flag: bool | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -79,10 +92,3 @@ class ComplaintDetailOut(ComplaintListItem):
     worker_note: str | None
     history: list[StatusHistoryItem] = []
     ai_recommendation: AIRecommendationOut | None = None
-
-
-class ReviewRequest(BaseModel):
-    category: ComplaintCategory
-    severity: Severity
-    worker_id: int
-    warden_note: str | None = None

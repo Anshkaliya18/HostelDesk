@@ -141,7 +141,6 @@ def get_db(request: Request) -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         authorization = request.headers.get("authorization")
-        x_user_id = request.headers.get("x-user-id")
         request.state.supabase_auth_user = None
         request.state.current_user = None
 
@@ -213,16 +212,6 @@ def get_db(request: Request) -> Generator[Session, None, None]:
                 _set_security_context(
                     db, role="ONBOARDING", auth_user_id=auth_user_id,
                 )
-            request.state.current_user = user
-        elif x_user_id is not None:
-            try:
-                user_id = int(x_user_id)
-            except ValueError as exc:
-                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Unknown user.") from exc
-            _set_security_context(db, role="LOOKUP", user_id=user_id)
-            user = db.get(User, user_id)
-            if user is not None:
-                _set_security_context(db, role=user.role.value, user_id=user.id)
             request.state.current_user = user
         yield db
     finally:

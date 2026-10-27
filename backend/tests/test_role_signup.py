@@ -36,11 +36,12 @@ def test_student_signup_creates_profile_without_confirmation_step(client, db, mo
 
 
 def test_worker_signup_creates_worker_profile(client, db, monkeypatch):
+    monkeypatch.setattr(settings, "staff_invite_code", "worker-secret")
     auth_id = uuid.uuid4()
     _stub_create(monkeypatch, auth_id)
     response = client.post("/auth/worker/signup", json={
         "name": "Worker Name", "email": "worker@example.test", "password": "long-password",
-        "worker_type": "ELECTRICIAN",
+        "worker_type": "ELECTRICIAN", "invite_code": "worker-secret",
     })
     assert response.status_code == 201
     user = db.query(User).filter_by(auth_user_id=auth_id).one()
@@ -115,3 +116,58 @@ def test_signup_retry_links_an_existing_auth_user_after_password_verification(cl
     assert db.query(User).filter_by(auth_user_id=auth_id).one().role is UserRole.STUDENT
     assert metadata_updates == [(auth_id, {"provider": "email", "role": "STUDENT"})]
     assert deleted == []
+
+
+# ---- Staff invite code ----
+
+
+def test_staff_signup_disabled_without_invite_code(client, monkeypatch):
+    monkeypatch.setattr(settings, "staff_invite_code", "")
+    response = client.post("/auth/warden/signup", json={
+        "name": "Warden Name", "email": "warden@example.test", "password": "long-password",
+        "invite_code": "anything",
+    })
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Staff signup is disabled."
+    assert client.post("/auth/worker/signup", json={
+        "name": "Worker Name", "email": "worker@example.test", "password": "long-password",
+        "worker_type": "PLUMBER", "invite_code": "anything",
+    }).status_code == 403
+
+
+def test_staff_signup_requires_matching_invite_code(client, monkeypatch):
+    monkeypatch.setattr(settings, "staff_invite_code", "real-code")
+    bad = client.post("/auth/warden/signup", json={
+        "name": "Warden Name", "email": "warden@example.test", "password": "long-password",
+    })
+    assert bad.status_code == 403
+    wrong = client.post("/auth/worker/signup", json={
+        "name": "Worker Name", "email": "worker@example.test", "password": "long-password",
+        "worker_type": "PLUMBER", "invite_code": "wrong-code",
+    })
+    assert wrong.status_code == 403
+    # No Supabase user may have been created for rejected attempts.
+    assert db_is_empty()
+
+
+def test_student_signup_stays_open_without_invite_code(client, monkeypatch):
+    monkeypatch.setattr(settings, "staff_invite_code", "")
+    auth_id = uuid.uuid4()
+    monkeypatch.setattr(security, "create_supabase_auth_user",
+                        lambda *_args: {"id": str(auth_id), "app_metadata": {"role": "STUDENT"}})
+    response = client.post("/auth/student/signup", json={
+        "name": "Student Name", "email": "open.student@example.test", "password": "long-password",
+    })
+    assert response.status_code == 201
+    assert response.json()["role"] == "STUDENT"
+
+
+def db_is_empty() -> bool:
+    from app.db.database import SessionLocal
+    from app.db.models import User
+
+    session = SessionLocal()
+    try:
+        return session.query(User).count() == 0
+    finally:
+        session.close()

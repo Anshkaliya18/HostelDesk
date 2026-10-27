@@ -23,3 +23,6 @@ uploads/*
 # Local scratch databases
 *.db
 *.sqlite
+
+# Demo seed assets (local only)
+demo_assets/

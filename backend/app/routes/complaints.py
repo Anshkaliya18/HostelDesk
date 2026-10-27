@@ -10,6 +10,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Request,
     Response,
     UploadFile,
     status,
@@ -19,18 +20,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.security import get_current_user, require_role
 from app.db.database import get_db
-from app.db.models import Complaint, ComplaintCategory, ComplaintStatus, Severity, User, UserRole
+from app.db.models import Complaint, ComplaintCategory, ComplaintStatus, Severity, User, UserRole, Worker
 from app.schemas.complaint import (
     AIRecommendationOut,
     ComplaintDetailOut,
     ComplaintListItem,
+    ReopenRequest,
     ReviewRequest,
     StatusHistoryItem,
     UserBrief,
 )
 from app.services import complaint_service, task_service
+from app.utils.rate_limit import complaint_limiter
 
 router = APIRouter(prefix="/complaints", tags=["Complaints"])
 logger = logging.getLogger(__name__)
@@ -42,6 +46,7 @@ def _list_item(complaint: Complaint) -> ComplaintListItem:
         if complaint.student
         else UserBrief(id=complaint.student_id, name="Student", role=UserRole.STUDENT)
     )
+    recommendation = complaint.recommendations[-1] if complaint.recommendations else None
     return ComplaintListItem(
         id=complaint.id,
         student=student_brief,
@@ -64,6 +69,12 @@ def _list_item(complaint: Complaint) -> ComplaintListItem:
         created_at=complaint.created_at,
         updated_at=complaint.updated_at,
         completed_at=complaint.completed_at,
+        ai_confidence=recommendation.confidence if recommendation else None,
+        ai_safety_flag=(
+            bool(recommendation.safety_flag)
+            if recommendation is not None and recommendation.safety_flag is not None
+            else None
+        ),
     )
 
 
@@ -78,6 +89,30 @@ def _detail(complaint: Complaint) -> ComplaintDetailOut:
         history=[StatusHistoryItem.model_validate(h) for h in (complaint.history or [])],
         ai_recommendation=AIRecommendationOut.model_validate(recommendation) if recommendation else None,
     )
+
+
+def _enforce_complaint_rate_limits(student_id: int) -> None:
+    """5 complaints per 10 minutes and 20 per day per student (sliding window)."""
+    if not complaint_limiter.check(
+        f"complaint-10min:{student_id}",
+        settings.complaint_rate_limit_10min,
+        10 * 60,
+    ):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "You have sent several reports in a short time. Please wait a few "
+            "minutes before reporting again.",
+        )
+    if not complaint_limiter.check(
+        f"complaint-day:{student_id}",
+        settings.complaint_rate_limit_daily,
+        24 * 60 * 60,
+    ):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Daily reporting limit reached. Please wait until tomorrow or "
+            "contact the warden directly for urgent issues.",
+        )
 
 
 @router.post(
@@ -95,11 +130,12 @@ def submit_complaint(
     student: User = Depends(require_role(UserRole.STUDENT)),
     db: Session = Depends(get_db),
 ) -> ComplaintDetailOut:
-    """FAST RESPONSE: persist the complaint, then return without waiting for Gemma.
+    """FAST RESPONSE: persist the complaint, then return without waiting for AI.
 
     BackgroundTasks schedules the one-and-only AI analysis after the response;
     it runs with its own DB session and can never erase the persisted row.
     """
+    _enforce_complaint_rate_limits(student.id)
     complaint, image, image_mime = complaint_service.create_complaint(
         db, student, description.strip(), block.strip(), room.strip(), photo
     )
@@ -116,13 +152,22 @@ def warden_queue(
     category: ComplaintCategory | None = None,
     severity: Severity | None = None,
     search: str | None = Query(default=None, max_length=120),
-    sort: str = Query(default="newest", pattern="^(newest|oldest|updated)$"),
+    block: str | None = Query(default=None, max_length=40),
+    needs_review: bool = Query(default=False),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|updated|review)$"),
     db: Session = Depends(get_db),
     warden: User = Depends(require_role(UserRole.WARDEN)),
 ) -> list[ComplaintListItem]:
     logger.info("Warden %s requested complaint queue", warden.id)
     return [_list_item(c) for c in complaint_service.list_complaints(
-        db, status_filter=status_filter, category=category, severity=severity, search=search, sort=sort
+        db,
+        status_filter=status_filter,
+        category=category,
+        severity=severity,
+        search=search,
+        block=block,
+        needs_review=needs_review,
+        sort=sort,
     )]
 
 
@@ -131,15 +176,13 @@ def my_complaints(db: Session = Depends(get_db),
                   student: User = Depends(require_role(UserRole.STUDENT))) -> list[ComplaintListItem]:
     rows = db.execute(
         select(Complaint).where(Complaint.student_id == student.id)
-        .options(selectinload(Complaint.student))
+        .options(
+            selectinload(Complaint.student),
+            selectinload(Complaint.approved_worker).selectinload(Worker.user),
+        )
         .order_by(Complaint.created_at.desc())
     ).scalars().all()
-    return [ComplaintListItem(
-        id=c.id, student=UserBrief.model_validate(c.student), block=c.block, room=c.room,
-        description=c.description, category=c.category, severity=c.severity,
-        ai_suggested_worker=c.ai_suggested_worker, approved_worker=None, status=c.status,
-        created_at=c.created_at, updated_at=c.updated_at, completed_at=c.completed_at,
-    ) for c in rows]
+    return [_list_item(c) for c in rows]
 
 
 @router.get("/{complaint_id}", response_model=ComplaintDetailOut, summary="Complaint detail (role-scoped)")
@@ -149,6 +192,69 @@ def complaint_detail(
     user: User = Depends(get_current_user),
 ) -> ComplaintDetailOut:
     complaint = complaint_service.get_complaint_scoped(db, complaint_id, user)
+    return _detail(complaint)
+
+
+@router.post(
+    "/{complaint_id}/confirm",
+    response_model=ComplaintDetailOut,
+    summary="Student confirms a completed complaint as resolved",
+)
+def confirm_resolved(
+    complaint_id: int,
+    db: Session = Depends(get_db),
+    student: User = Depends(require_role(UserRole.STUDENT)),
+) -> ComplaintDetailOut:
+    """History-only confirmation (status stays COMPLETED); the student owns this."""
+    complaint = complaint_service.confirm_resolved(db, student, complaint_id)
+    return _detail(complaint)
+
+
+@router.post(
+    "/{complaint_id}/reopen",
+    response_model=ComplaintDetailOut,
+    summary="Student reopens a completed complaint with a reason",
+)
+def reopen_complaint(
+    complaint_id: int,
+    payload: ReopenRequest,
+    db: Session = Depends(get_db),
+    student: User = Depends(require_role(UserRole.STUDENT)),
+) -> ComplaintDetailOut:
+    """Moves the complaint back to WARDEN_REVIEW so the warden can decide again."""
+    complaint = complaint_service.reopen_complaint(db, student, complaint_id, payload.reason)
+    return _detail(complaint)
+
+
+@router.post(
+    "/{complaint_id}/reanalyze",
+    response_model=ComplaintDetailOut,
+    summary="Warden re-runs the AI analysis (warden only)",
+)
+async def reanalyze_complaint(
+    complaint_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    warden: User = Depends(require_role(UserRole.WARDEN)),
+) -> ComplaintDetailOut:
+    """Re-analyze a complaint that has no (usable) recommendation yet.
+
+    The gemini call runs in the background so the response stays fast; the
+    prior recommendation rows are preserved as an audit trail.
+    """
+    complaint = db.get(Complaint, complaint_id)
+    if complaint is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Complaint not found.")
+    if complaint.status not in complaint_service._REANALYZABLE_status:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Complaint is in '{complaint.status.value}' and cannot be re-analyzed.",
+        )
+    image, image_mime = complaint_service.load_photo_bytes(db, complaint)
+    background_tasks.add_task(
+        complaint_service.reanalyze_complaint_background, complaint_id
+    )
+    logger.info("Warden %s scheduled AI re-analysis for complaint %s", warden.id, complaint_id)
     return _detail(complaint)
 
 

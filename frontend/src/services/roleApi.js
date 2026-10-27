@@ -1,14 +1,15 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
 import { supabase } from './supabase.js'
+import { track } from '../utils/coldStart.js'
 
 async function request(path, options = {}, tokenOverride) {
   const { data: { session } = {} } = supabase ? await supabase.auth.getSession() : {}
   const token = tokenOverride || session?.access_token
   if (!token) throw new Error('Your session has ended. Sign in again.')
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await track(fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, ...options.headers },
-  })
+  }))
   if (!response.ok) {
     let message = `Request failed (${response.status}).`
     try { const body = await response.json(); if (typeof body.detail === 'string') message = body.detail }
@@ -19,11 +20,11 @@ async function request(path, options = {}, tokenOverride) {
 }
 
 async function signup(path, payload) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await track(fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  })
+  }))
   if (!response.ok) {
     let message = `Signup failed (${response.status}).`
     try { const body = await response.json(); if (typeof body.detail === 'string') message = body.detail }

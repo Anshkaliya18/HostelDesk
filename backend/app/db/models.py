@@ -169,6 +169,13 @@ class AIRecommendation(Base):
     category: Mapped[ComplaintCategory | None] = mapped_column(Enum(ComplaintCategory), nullable=True)
     severity: Mapped[Severity | None] = mapped_column(Enum(Severity), nullable=True)
     suggested_worker: Mapped[WorkerType | None] = mapped_column(Enum(WorkerType), nullable=True)
+    # Richer queue-aware fields (additive, nullable; see migration in
+    # alembic/versions that adds the same columns on Postgres).
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    safety_flag: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    duplicate_of_complaint_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     raw_response: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False

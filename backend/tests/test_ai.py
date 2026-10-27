@@ -237,7 +237,7 @@ def test_warden_review_during_ai_run_is_preserved(client, seed_users, db, monkey
     users = seed_users()
     description = "Water cooler in the mess hall is leaking badly."
 
-    async def review_then_analyze(image, mime, text):
+    async def review_then_analyze(image, mime, text, recent=None):
         # The warden acts WHILE the (stubbed) AI call is in flight.
         review_db = SessionLocal()
         try:
@@ -276,7 +276,7 @@ def test_warden_review_during_ai_run_is_preserved(client, seed_users, db, monkey
 
 
 # ---------------------------------------------------------------------------
-# Model chain: primary gemma-4-31b-it with fallback gemma-4-26b-a4b-it,
+# Model chain: primary gemini-2.5-flash with fallback gemini-2.5-flash-lite,
 # bounded retries for transient failures, never a duplicate/rogue request.
 # Tight policy: 1 attempt + 1 retry per model, then fallback once.
 # Max 4 total Gemini requests per complaint.
@@ -318,10 +318,10 @@ def test_primary_503_exhausts_bounded_retries_falls_back_and_succeeds(monkeypatc
         ],
     )
     result = asyncio.run(ai_service._call_gemini_async(None, None, "fan broken"))
-    # 31b: 1 attempt + 1 bounded retry, then 26b-a4b succeeded on its first try.
+    # 2.5-flash: 1 attempt + 1 bounded retry, then flash-lite succeeded on its first try.
     models = [call[0].split("/models/")[-1].split(":")[0] for call in calls]
-    assert models == ["gemma-4-31b-it", "gemma-4-31b-it", "gemma-4-26b-a4b-it"]
-    assert result["model"] == "gemma-4-26b-a4b-it"
+    assert models == ["gemini-2.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    assert result["model"] == "gemini-2.5-flash-lite"
 
 
 def test_429_then_success_never_hits_fallback(monkeypatch):
@@ -334,7 +334,7 @@ def test_429_then_success_never_hits_fallback(monkeypatch):
     )
     result = asyncio.run(ai_service._call_gemini_async(None, None, "fan broken"))
     assert len(calls) == 2  # exactly one retry, no fallback request
-    assert result["model"] == "gemma-4-31b-it"
+    assert result["model"] == "gemini-2.5-flash"
 
 
 def test_4xx_not_retried_moves_straight_to_fallback(monkeypatch):
@@ -347,7 +347,7 @@ def test_4xx_not_retried_moves_straight_to_fallback(monkeypatch):
     )
     result = asyncio.run(ai_service._call_gemini_async(None, None, "fan broken"))
     models = [call[0].split("/models/")[-1].split(":")[0] for call in calls]
-    assert models == ["gemma-4-31b-it", "gemma-4-26b-a4b-it"]
+    assert models == ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
     assert len(calls) == 2  # one 4xx on primary + one success on fallback
 
 
@@ -390,3 +390,151 @@ def test_markdown_fenced_answer_is_parsed(monkeypatch):
     )
     result = asyncio.run(ai_service._call_gemini_async(None, None, "tap leaking"))
     assert result["category"] == "PLUMBING"
+
+
+# ---------------------------------------------------------------------------
+# Gemini 2.5 request shape: no thinking, strict responseSchema, recent-context
+# duplicate list in the prompt.
+# ---------------------------------------------------------------------------
+
+
+def test_generation_config_disables_thinking_and_sets_schema(monkeypatch):
+    calls = _chain(
+        monkeypatch,
+        [(200, _ok_body('{"category": "ELECTRICAL", "severity": "HIGH", "suggested_worker": "ELECTRICIAN"}'))],
+    )
+    recent = [{"id": 3, "room": "204", "category": "ELECTRICAL", "note": "fan stopped"}]
+    result = asyncio.run(ai_service._call_gemini_async(None, None, "fan broken", recent))
+
+    _, kwargs = calls[0]
+    generation = kwargs["json"]["generationConfig"]
+    assert generation["thinkingConfig"] == {"thinkingBudget": 0}
+    assert generation["responseMimeType"] == "application/json"
+    assert generation["responseSchema"]["required"] == ["category", "severity", "suggested_worker"]
+    prompt_text = kwargs["json"]["contents"][0]["parts"][0]["text"]
+    assert "Recent open complaints in the same block" in prompt_text
+    assert "#3 room 204, ELECTRICAL" in prompt_text
+    assert result["model"] == "gemini-2.5-flash"
+
+
+def test_gemma_model_names_skip_response_schema(monkeypatch):
+    monkeypatch.setattr(ai_service.settings, "gemini_model", "gemma-4-31b-it")
+    monkeypatch.setattr(ai_service.settings, "gemini_fallback_model", "")
+    calls = _chain(monkeypatch, [(200, _ok_body('{"category": "CLEANING"}'))])
+    asyncio.run(ai_service._call_gemini_async(None, None, "corridor dirty"))
+    _, kwargs = calls[0]
+    generation = kwargs["json"]["generationConfig"]
+    assert "thinkingConfig" not in generation
+    assert "responseSchema" not in generation
+
+
+def test_reason_is_capped_at_20_words():
+    long_text = " ".join(f"word{n}" for n in range(1, 30))
+    result = ai_service.AIAnalysisResult.model_validate(
+        {
+            "category": "electrical",
+            "severity": "high",
+            "suggested_worker": "electrician",
+            "reason": long_text,
+            "confidence": "high",
+        }
+    )
+    assert len(result.reason.split()) <= 20
+    assert result.confidence.value == "HIGH"
+    assert result.safety_flag is False
+    assert result.duplicate_of_complaint_id is None
+
+
+# ---------------------------------------------------------------------------
+# Richer persisted recommendation: reason/confidence/safety/duplicate/model,
+# safety escalation, and duplicate-id validation.
+# ---------------------------------------------------------------------------
+
+
+def _mock_analysis(category="ELECTRICAL", severity="LOW", worker="ELECTRICIAN", **extra):
+    from app.schemas.ai import AIAnalysisResult
+
+    payload = {
+        "category": category,
+        "severity": severity,
+        "suggested_worker": worker,
+        "model": "gemini-2.5-flash",
+    }
+    payload.update(extra)
+    return AIAnalysisResult.model_validate(payload)
+
+
+def test_rich_fields_are_persisted(client, seed_users, monkeypatch):
+    users = seed_users()
+
+    async def fake(image, mime, text, recent=None):
+        return _mock_analysis(reason="Fan sparking loudly", confidence="HIGH")
+
+    monkeypatch.setattr(ai_service, "analyze_complaint", fake)
+    body = _submit(client, users)
+    detail = _detail(client, users, body["id"])
+    recommendation = detail["ai_recommendation"]
+    assert recommendation["reason"] == "Fan sparking loudly"
+    assert recommendation["confidence"] == "HIGH"
+    assert recommendation["model"] == "gemini-2.5-flash"
+    assert recommendation["safety_flag"] is False
+    assert recommendation["duplicate_of_complaint_id"] is None
+
+
+def test_safety_flag_forces_high_severity(client, seed_users, monkeypatch):
+    users = seed_users()
+
+    async def fake(image, mime, text, recent=None):
+        return _mock_analysis(severity="LOW", safety_flag=True)
+
+    monkeypatch.setattr(ai_service, "analyze_complaint", fake)
+    body = _submit(client, users)
+    detail = _detail(client, users, body["id"])
+    # Both the recommendation and the complaint default to HIGH severity.
+    assert detail["severity"] == "HIGH"
+    assert detail["ai_recommendation"]["severity"] == "HIGH"
+    assert detail["ai_recommendation"]["safety_flag"] is True
+
+
+def test_hallucinated_duplicate_id_is_dropped(client, seed_users, monkeypatch):
+    users = seed_users()
+
+    async def fake(image, mime, text, recent=None):
+        return _mock_analysis(duplicate_of_complaint_id=4242)
+
+    monkeypatch.setattr(ai_service, "analyze_complaint", fake)
+    body = _submit(client, users)
+    detail = _detail(client, users, body["id"])
+    assert detail["ai_recommendation"]["duplicate_of_complaint_id"] is None
+
+
+def test_valid_duplicate_id_against_recent_complaints_is_kept(client, seed_users, monkeypatch):
+    users = seed_users()
+
+    async def fake(image, mime, text, recent=None):
+        # The first pass classifies normally; the second sees the list and
+        # flags the first complaint as the likely duplicate.
+        target = state["first_id"]
+        return _mock_analysis(
+            category="PLUMBING",
+            worker="PLUMBER",
+            duplicate_of_complaint_id=target,
+        )
+
+    state = {"first_id": None}
+    monkeypatch.setattr(ai_service, "analyze_complaint", fake)
+    first = _submit(client, users)
+    state["first_id"] = first["id"]
+    detail = _detail(client, users, first["id"])
+    assert detail["ai_recommendation"]["duplicate_of_complaint_id"] is None  # fresh analysis sees no earlier complaint
+
+    second = client.post(
+        "/complaints",
+        data={"description": "Same cooler leaks water again today badly.", "block": "B", "room": "201"},
+        headers=auth_header(users["student"]),
+    )
+    assert second.status_code == 201, second.text
+    detail = _detail(client, users, second.json()["id"])
+    assert detail["ai_recommendation"]["duplicate_of_complaint_id"] == first["id"]
+
+\n

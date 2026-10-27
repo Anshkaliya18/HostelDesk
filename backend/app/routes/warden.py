@@ -1,6 +1,6 @@
 """Warden dashboard, worker directory, and operational reports."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -52,6 +52,21 @@ def workers_list(db: Session = Depends(get_db), _warden: User = Depends(require_
     return [WorkerOut(id=w.id, name=w.user.name, worker_type=w.worker_type.value,
                       is_active=w.is_active, active_tasks=sum(t.worker_id == w.id for t in tasks))
             for w in workers]
+
+
+@router.post("/ai-sweep", summary="Background sweep of stale unanalyzed complaints (warden only)")
+def ai_sweep(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _warden: User = Depends(require_role(UserRole.WARDEN)),
+) -> dict:
+    """Bounded self-healing sweep: pick up to 5 SUBMITTED complaints that are
+    older than 2 minutes and have no recommendation, and schedule their AI
+    analysis in the background (covers a failed/cold AI pipeline)."""
+    stale = complaint_service.find_stale_submitted_complaints(db)
+    for complaint in stale:
+        background_tasks.add_task(complaint_service.process_complaint_ai, complaint.id, None, None)
+    return {"scheduled": [complaint.id for complaint in stale]}
 
 
 @router.get("/reports", summary="Warden operational report")

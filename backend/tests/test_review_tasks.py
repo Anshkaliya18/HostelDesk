@@ -131,9 +131,35 @@ def test_worker_cannot_complete_without_starting(client, seed_users, db):
     task = db.query(Task).filter(Task.complaint_id == complaint["id"]).one()
 
     illegal = client.patch(
-        f"/tasks/{task.id}/status", json={"status": "COMPLETED"}, headers=auth_header(users["worker_electrician_user"])
+        f"/tasks/{task.id}/status",
+        json={"status": "COMPLETED", "note": "Replaced the damaged wall socket."},
+        headers=auth_header(users["worker_electrician_user"]),
     )
     assert illegal.status_code == 400
+
+
+def test_worker_cannot_complete_without_a_note(client, seed_users, db):
+    users = seed_users()
+    complaint = _submit(client, users)
+    _assign(client, users, complaint["id"], users["electrician"])
+    task = db.query(Task).filter(Task.complaint_id == complaint["id"]).one()
+    client.patch(
+        f"/tasks/{task.id}/status",
+        json={"status": "IN_PROGRESS", "note": "started repair"},
+        headers=auth_header(users["worker_electrician_user"]),
+    )
+
+    for missing in ({"status": "COMPLETED"}, {"status": "COMPLETED", "note": "  "}):
+        response = client.patch(
+            f"/tasks/{task.id}/status", json=missing, headers=auth_header(users["worker_electrician_user"])
+        )
+        assert response.status_code == 422
+    short = client.patch(
+        f"/tasks/{task.id}/status",
+        json={"status": "COMPLETED", "note": "done"},
+        headers=auth_header(users["worker_electrician_user"]),
+    )
+    assert short.status_code == 422
 
 
 def test_full_worker_lifecycle_completes_complaint(client, seed_users, db):

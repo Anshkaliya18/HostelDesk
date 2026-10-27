@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      '/health': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/complaints': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       // Keep /warden and /warden/* frontend URLs in Vite's SPA fallback; only
       // forward the concrete Warden API endpoints to FastAPI.

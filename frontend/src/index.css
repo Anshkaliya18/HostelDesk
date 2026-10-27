@@ -1322,6 +1322,226 @@ button:disabled {
   }
 }
 
+/* ---- Student tabs + complaint tracking ("My complaints") ---- */
+
+.student-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.student-tab {
+  appearance: none;
+  border: 1px solid var(--color-border, #d8dbe0);
+  background: #fff;
+  color: var(--color-text, #1f2933);
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.student-tab--active {
+  background: var(--color-accent, #1668d9);
+  border-color: var(--color-accent, #1668d9);
+  color: #fff;
+}
+
+.student-tab:focus-visible {
+  outline: 2px solid var(--color-accent, #1668d9);
+  outline-offset: 2px;
+}
+
+.track {
+  display: block;
+}
+
+.track-loading,
+.track-empty,
+.track-refresh {
+  color: var(--color-text-muted, #52606d);
+  font-size: 14px;
+}
+
+.track-empty__help {
+  font-size: 13.5px;
+  margin-top: 6px;
+}
+
+.track-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.track-row__button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  background: #fff;
+  border: 1px solid var(--color-border, #d8dbe0);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.track-row__button:hover {
+  border-color: var(--color-accent, #1668d9);
+}
+
+.track-row__button:focus-visible {
+  outline: 2px solid var(--color-accent, #1668d9);
+  outline-offset: 2px;
+}
+
+.track-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.track-row__meta {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted, #52606d);
+}
+
+.track-row__desc {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+.track-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.track-badge--done {
+  background: #e6f5ec;
+  color: #1b6b41;
+}
+
+.track-badge--active {
+  background: #e8f0fe;
+  color: #1450a3;
+}
+
+.track-badge--wait {
+  background: #fdf3e1;
+  color: #8a5a00;
+}
+
+.track-detail {
+  display: block;
+}
+
+.track-back {
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-accent, #1668d9);
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 10px;
+}
+
+.track-reference {
+  font-size: 13.5px;
+  color: var(--color-text-muted, #52606d);
+  margin: 0 0 6px;
+}
+
+.track-description {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.track-note {
+  font-size: 14px;
+  margin: 6px 0;
+}
+
+.track-timeline-title {
+  font-size: 14px;
+  margin: 14px 0 8px;
+}
+
+.track-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.track-timeline li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.track-timeline-meta {
+  font-size: 13px;
+  color: var(--color-text-muted, #52606d);
+}
+
+.track-actions {
+  margin-top: 14px;
+  border-top: 1px solid var(--color-border, #d8dbe0);
+  padding-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.track-actions-help {
+  font-size: 14px;
+  margin: 0;
+}
+
+.track-actions .button {
+  justify-self: start;
+}
+
+.track-reopen {
+  display: grid;
+  gap: 8px;
+}
+
+.track-reason {
+  font: inherit;
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border, #d8dbe0);
+  border-radius: 10px;
+  resize: vertical;
+}
+
+.track-message {
+  font-size: 14px;
+  color: #1b6b41;
+}
+
+.track-error {
+  color: var(--color-danger, #b3261e);
+  font-size: 14px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1337,3 +1557,8 @@ button:disabled {
     animation-iteration-count: infinite !important;
   }
 }
+
+/* ---- Cold start notice (free-tier API hosting) ---- */
+.cold-start-banner { position:fixed; right:16px; bottom:16px; z-index:60; background:#1f2933; color:#fff; font-size:13px; font-weight:600; padding:10px 16px; border-radius:999px; box-shadow:0 6px 20px rgba(15,23,32,.25); animation:coldstart-pulse 1.6s ease-in-out infinite }
+@keyframes coldstart-pulse { 0%,100% { opacity:.85 } 50% { opacity:1 } }
+@media (prefers-reduced-motion: reduce) { .cold-start-banner { animation:none } }

@@ -29,16 +29,48 @@ class SuggestedWorker(enum.StrEnum):
     CARPENTER = "CARPENTER"
 
 
+class Confidence(enum.StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+def _max_20_words(value: object) -> object:
+    """Keep the AI reason short and readable (maximum 20 words)."""
+    if isinstance(value, str):
+        words = value.strip().split()
+        if len(words) > 20:
+            return " ".join(words[:20])
+        return value.strip() or None
+    return value
+
+
 class AIAnalysisResult(BaseModel):
-    """Strictly validated Gemini output."""
+    """Strictly validated Gemini output.
+
+    ``category``/``severity``/``suggested_worker`` are mandatory; the richer
+    ``reason``/``confidence``/``safety_flag``/``duplicate_of_complaint_id``
+    fields are optional so a terse model reply still validates. Provenance is
+    recorded from ``model`` set by the caller, though the model may include it.
+    """
 
     category: ComplaintCategory
     severity: Severity
     suggested_worker: SuggestedWorker
+    reason: str | None = None
+    confidence: Confidence | None = None
+    safety_flag: bool = False
+    duplicate_of_complaint_id: int | None = None
+    model: str | None = None
 
-    @field_validator("*", mode="before")
+    @field_validator("category", "severity", "suggested_worker", "confidence", mode="before")
     @classmethod
     def uppercase_strings(cls, value: object) -> object:
         if isinstance(value, str):
             return value.strip().upper()
         return value
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def limit_reason(cls, value: object) -> object:
+        return _max_20_words(value)

@@ -16,10 +16,12 @@ function AuthScreen({ role, mode, setMode, session, onSignOut, formError, setFor
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [workerType, setWorkerType] = useState('CLEANER')
+  const [inviteCode, setInviteCode] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const isSignup = mode === 'signup'
+  const needsInviteCode = role === 'warden' || role === 'worker'
 
   async function submit(event) {
     event.preventDefault()
@@ -30,6 +32,7 @@ function AuthScreen({ role, mode, setMode, session, onSignOut, formError, setFor
       if (isSignup) {
         const payload = { name: name.trim(), email: normalizedEmail, password }
         if (role === 'worker') payload.worker_type = workerType
+        if (needsInviteCode) payload.invite_code = inviteCode.trim()
         const signup = { student: signupStudent, warden: signupWarden, worker: signupWorker }[role]
         await signup(payload)
         const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password })
@@ -93,6 +96,7 @@ function AuthScreen({ role, mode, setMode, session, onSignOut, formError, setFor
           <label>Email address<input required type="email" maxLength="254" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>
           <label>Password<span className="role-password-wrap"><input required type={showPassword ? 'text' : 'password'} autoComplete={isSignup ? 'new-password' : 'current-password'} minLength={isSignup ? 8 : undefined} maxLength="128" value={password} onChange={e => setPassword(e.target.value)} placeholder={isSignup ? 'At least 8 characters' : 'Enter your password'} /><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? 'Hide' : 'Show'}</button></span></label>
           {isSignup && role === 'worker' && <label>Work type<select value={workerType} onChange={e => setWorkerType(e.target.value)}>{['ELECTRICIAN','PLUMBER','CLEANER','CARPENTER'].map(type => <option key={type} value={type}>{type[0] + type.slice(1).toLowerCase()}</option>)}</select></label>}
+          {isSignup && needsInviteCode && <label>Invite code<input required minLength="1" maxLength="200" autoComplete="off" value={inviteCode} onChange={e => setInviteCode(e.target.value)} placeholder="Ask the warden office for the staff invite code" /></label>}
           {formError && <p className="role-auth-error" role="alert">{formError}</p>}
           {message && <p className="role-auth-message" role="status">{message}</p>}
           {!supabase && <p className="role-auth-error" role="alert">Authentication is not configured. Ask the app administrator to set up Supabase.</p>}

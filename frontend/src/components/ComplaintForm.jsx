@@ -267,11 +267,15 @@ export default function ComplaintForm({ onSuccess, accessToken, autoFocusDescrip
               value={block}
               required
               autoComplete="off"
+              list="block-suggestions"
               aria-invalid={Boolean(errors.block)}
               aria-describedby={blockDescribedBy}
               onChange={handleBlockChange}
               onBlur={() => handleBlur('block')}
             />
+            <datalist id="block-suggestions">
+              {['A', 'B', 'C', 'D', 'E', 'F'].map(letter => <option key={letter} value={letter} />)}
+            </datalist>
             {errors.block ? (
               <p className="field-error" id="block-error">
                 <AlertIcon size={15} />

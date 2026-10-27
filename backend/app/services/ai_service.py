@@ -1,15 +1,16 @@
 """AI orchestration service (Gemini) — async.
 
 Keeps the entire Gemini integration isolated in this module. Takes the
-complaint photo + description, asks Gemma 4 via the Gemini API for a
-structured JSON classification, and validates the reply with Pydantic.
+complaint photo + description, asks the configured Gemini model
+(default: gemini-2.5-flash, fallback gemini-2.5-flash-lite) for a structured
+JSON classification, and validates the reply with Pydantic.
 
 All network I/O is async (httpx.AsyncClient) so the FastAPI background
 task never blocks the main event loop.
 
 Student-facing request flow (POST /complaints):
     validate → save complaint (COMMIT) → return HTTP 201 immediately
-    → background Gemma 4 analysis → save recommendation → WARDEN_REVIEW
+    → background Gemini analysis → save recommendation → WARDEN_REVIEW
 
 The student never waits for Gemini, retries, fallback, JSON parsing, or DB.
 """
@@ -37,21 +38,62 @@ Classify a hostel maintenance problem from ONE photo and a student description
 Reply with ONLY this JSON object, no markdown, no explanation:
 {{"category": "ELECTRICAL|PLUMBING|CLEANING|FURNITURE",
   "severity": "LOW|MEDIUM|HIGH",
-  "suggested_worker": "ELECTRICIAN|PLUMBER|CLEANER|CARPENTER"}}
+  "suggested_worker": "ELECTRICIAN|PLUMBER|CLEANER|CARPENTER",
+  "reason": "<max 20 words, English>",
+  "confidence": "LOW|MEDIUM|HIGH",
+  "safety_flag": <true only for exposed wiring, flooding, gas smell, fire risk, broken stairs/rail>,
+  "duplicate_of_complaint_id": <integer id from the recent complaints list, or null>}}
 
 Rules:
 - Use only the listed values.
 - Estimate severity from safety risk and impact.
 - Suggest a worker TYPE, never an individual person.
-- Base everything only on the photo and description; never invent problems.
+- Base everything only on the photo and description{recent_clause}; never invent problems.
+- A past complaint is a likely duplicate ONLY if the same problem in the same
+  room is still open; answer from the photo and text alone. If unsure, return
+  null for duplicate_of_complaint_id.
 - The warden makes the final assignment; you only recommend.
 
 Description: {description}
 """
 
+RECENT_LIST_LINE = """\n\nRecent open complaints in the same block (check for duplicates):
+{recent_lines}
+"""
+
+# Structured reply definition (Gemini 2.5 models): forces a compact JSON
+# object and disables hidden thinking for speed/determinism.
+RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "category": {"type": "STRING", "enum": ["ELECTRICAL", "PLUMBING", "CLEANING", "FURNITURE"]},
+        "severity": {"type": "STRING", "enum": ["LOW", "MEDIUM", "HIGH"]},
+        "suggested_worker": {"type": "STRING", "enum": ["ELECTRICIAN", "PLUMBER", "CLEANER", "CARPENTER"]},
+        "reason": {"type": "STRING"},
+        "confidence": {"type": "STRING", "enum": ["LOW", "MEDIUM", "HIGH"]},
+        "safety_flag": {"type": "BOOLEAN"},
+        "duplicate_of_complaint_id": {"type": "INTEGER", "nullable": True},
+    },
+    "required": ["category", "severity", "suggested_worker"],
+}
+
+
+def build_prompt(description: str, recent: list[dict[str, Any]] | None = None) -> str:
+    prompt = PROMPT_TEMPLATE.format(
+        description=description,
+        recent_clause=" and the recent complaints list" if recent else "",
+    )
+    if recent:
+        lines = "\n".join(
+            f"- #{item['id']} room {item['room']}, {item['category']}: {item['note']}"
+            for item in recent
+        )
+        prompt += RECENT_LIST_LINE.format(recent_lines=lines)
+    return prompt
+
 # Tight retry policy for hackathon MVP: one attempt + one retry per model,
 # then fallback once. Maximum 4 total Gemini requests per complaint.
-# Only throttle/unavailability statuses are retried; 4xx moves straight to
+# Only throttle/unavailability status are retried; 4xx moves straight to
 # the fallback model.
 RETRYABLE_STATUS_CODES = {429, 503}
 MAX_RETRIES_PER_MODEL = 1
@@ -66,12 +108,13 @@ class AIUnavailableResult:
         self.ok = False
 
 
-def build_prompt(description: str) -> str:
-    return PROMPT_TEMPLATE.format(description=description)
+def _uses_thinking(model: str) -> bool:
+    """Gemini 2.5 models support a thinking budget; disable it for speed."""
+    return model.lower().startswith("gemini-2.5")
 
 
 def _model_chain() -> list[str]:
-    """Primary then fallback Gemma models, via configuration (never hard-coded)."""
+    """Primary then fallback models, via configuration (never hard-coded)."""
     models = [settings.gemini_model, settings.gemini_fallback_model]
     unique: list[str] = []
     for model in models:
@@ -83,10 +126,10 @@ def _model_chain() -> list[str]:
 def _extract_answer_text(parts: list[dict[str, Any]]) -> str | None:
     """Return the final answer text from a candidate.
 
-    Thinking-class models (Gemma 4) emit chain-of-thought parts flagged with
-    'thought': True before the real answer. Reading part[0] would grab the
-    thoughts; the answer is the last non-thought part. Chain-of-thought is
-    never logged or stored.
+    Thinking-class models (Gemma 4, or Gemini 2.5 with a non-zero thinking
+    budget) emit chain-of-thought parts flagged with 'thought': True before
+    the real answer. Reading part[0] would grab the thoughts; the answer is
+    the last non-thought part. Chain-of-thought is never logged or stored.
     """
     for part in reversed(parts):
         if isinstance(part, dict) and not part.get("thought") and "text" in part:
@@ -138,7 +181,7 @@ async def _post_generate_async(
     """Single request for ONE model with at most one bounded retry.
 
     Returns the parsed Gemini body dict, or None after exhausting retries
-    for transient statuses. Never raises; all errors are logged (no secrets).
+    for transient status. Never raises; all errors are logged (no secrets).
     """
     url = f"{GEMINI_API_BASE_URL}/models/{model}:generateContent"
     headers = {"x-goog-api-key": settings.gemini_api_key}
@@ -197,7 +240,7 @@ async def _post_generate_async(
 
         if response.status_code in RETRYABLE_STATUS_CODES and attempt < MAX_RETRIES_PER_MODEL:
             logger.warning(
-                "[AI] Gemma %s transient HTTP %s; retry %d/%d in %ds",
+                "[AI] model %s transient HTTP %s; retry %d/%d in %ds",
                 model,
                 response.status_code,
                 attempt + 1,
@@ -218,9 +261,10 @@ async def _request_model_async(
     image: bytes | None,
     image_mime: str | None,
     description: str,
+    recent: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Analyze with ONE model. Returns validated dict, or error dict."""
-    parts: list[dict[str, Any]] = [{"text": build_prompt(description)}]
+    parts: list[dict[str, Any]] = [{"text": build_prompt(description, recent)}]
     if image:
         # Validate/sanitize MIME; never blindly assume image/jpeg.
         mime = image_mime or "image/jpeg"
@@ -241,13 +285,23 @@ async def _request_model_async(
             }
         )
 
+    generation_config: dict[str, Any] = {
+        "temperature": 0,
+        "maxOutputTokens": settings.gemini_max_output_tokens,
+        "responseMimeType": "application/json",
+    }
+    if _uses_thinking(model):
+        # Gemini 2.5 models: disable hidden thinking for a fast, deterministic
+        # classification (the budget is in tokens; 0 turns it off).
+        generation_config["thinkingConfig"] = {"thinkingBudget": 0}
+    if not model.lower().startswith("gemma"):
+        # Structured-output schema is supported by Gemini 1.5+/2.5 models;
+        # Gemma models accept free-form JSON text only.
+        generation_config["responseSchema"] = RESPONSE_SCHEMA
+
     payload: dict[str, Any] = {
         "contents": [{"role": "user", "parts": parts}],
-        "generationConfig": {
-            "temperature": 0,
-            "maxOutputTokens": settings.gemini_max_output_tokens,
-            "responseMimeType": "application/json",
-        },
+        "generationConfig": generation_config,
     }
 
     started = time.perf_counter()
@@ -292,10 +346,13 @@ async def _request_model_async(
 
 
 async def _call_gemini_async(
-    image: bytes | None, image_mime: str | None, description: str
+    image: bytes | None,
+    image_mime: str | None,
+    description: str,
+    recent: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
-    """Analyze with the primary Gemma model, falling back to the configured
-    fallback Gemma model. Returns parsed json (with 'model' provenance) or
+    """Analyze with the primary model, falling back to the configured
+    fallback model. Returns parsed json (with 'model' provenance) or
     an error dict when every model failed. Never raises; never fabricates."""
     if not settings.gemini_api_key:
         logger.warning("AI analysis skipped: GEMINI_API_KEY is not configured.")
@@ -307,7 +364,7 @@ async def _call_gemini_async(
         for model in models:
             started = time.perf_counter()
             result = await _request_model_async(
-                client, model, image, image_mime, description
+                client, model, image, image_mime, description, recent
             )
             duration_ms = (time.perf_counter() - started) * 1000
             if result is not None and "error" in result and "model" in result:
@@ -323,25 +380,28 @@ async def _call_gemini_async(
                 aggregated.append(f"{model}: gemini_request_failed")
                 logger.warning("[AI] model %s request failed in %.0fms", model, duration_ms)
                 continue
-            logger.info("[AI] Gemma model used: %s (%.0fms)", model, duration_ms)
+            logger.info("[AI] model used: %s (%.0fms)", model, duration_ms)
             return result
 
-    logger.error("All configured Gemma models failed: %s", "; ".join(aggregated))
+    logger.error("All configured Gemini models failed: %s", "; ".join(aggregated))
     return {"error": "gemini_unavailable", "raw": "; ".join(aggregated)[:400]}
 
 
 async def analyze_complaint(
-    image: bytes | None, image_mime: str | None, description: str
+    image: bytes | None,
+    image_mime: str | None,
+    description: str,
+    recent: list[dict[str, Any]] | None = None,
 ) -> AIAnalysisResult | AIUnavailableResult:
     """Public entry point. Never raises.
 
-    Calls Gemma 4 through the Gemini API exactly once per complaint
-    (primary + bounded retry + fallback), validates the structured JSON,
-    and returns either a valid AIAnalysisResult or a safe failure result.
+    Calls the configured model through the Gemini API exactly once per
+    complaint (primary + bounded retry + fallback), validates the structured
+    JSON, and returns either a valid AIAnalysisResult or a safe failure result.
     """
     started = time.perf_counter()
     try:
-        parsed = await _call_gemini_async(image, image_mime, description)
+        parsed = await _call_gemini_async(image, image_mime, description, recent)
         if parsed is None or "error" in parsed:
             return AIUnavailableResult(parsed or {"error": "gemini_empty_response"})
 

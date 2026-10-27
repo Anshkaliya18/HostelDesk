@@ -35,7 +35,7 @@ def _submit_with_photo(
                 content_type,
             )
         },
-        headers={"X-User-Id": str(users["student"])},
+        headers=auth_header(users["student"]),
     )
 
 
@@ -127,7 +127,7 @@ class TestLocalStorage:
                 "block": "B",
                 "room": "201",
             },
-            headers={"X-User-Id": str(users["student"])},
+            headers=auth_header(users["student"]),
         )
         assert response.status_code == 201
         assert response.json()["photo_available"] is False
@@ -221,7 +221,7 @@ class TestSupabaseStorage:
         created = _submit_with_photo(client, users).json()
         response = client.get(
             f"/complaints/{created['id']}/photo/url",
-            headers={"X-User-Id": str(users["student"])},
+            headers=auth_header(users["student"]),
         )
         assert response.status_code == 200
         payload = response.json()
@@ -238,7 +238,7 @@ class TestSupabaseStorage:
         created = _submit_with_photo(client, users).json()
         response = client.get(
             f"/complaints/{created['id']}/photo/url",
-            headers={"X-User-Id": str(users["worker_plumber_user"])},
+            headers=auth_header(users["worker_plumber_user"]),
         )
         assert response.status_code == 404
 

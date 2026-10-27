@@ -1,7 +1,8 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
-// The backend persists the complaint row immediately, then uploads the photo
-// and runs the Gemma analysis inside this same request, so the client must
-// wait far longer than a plain CRUD call.
+// The backend persists the complaint row immediately, then classifies and
+// stores the photo while the AI analysis runs in the background, so the
+// client must allow far longer than a plain CRUD call.
+import { track } from '../utils/coldStart.js'
 const REQUEST_TIMEOUT_MS = 120_000
 
 function extractReference(payload) {
@@ -47,12 +48,12 @@ export async function submitComplaint({ description, block, room, photo, accessT
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   try {
-    const response = await fetch(`${API_BASE_URL}/complaints`, {
+    const response = await track(fetch(`${API_BASE_URL}/complaints`, {
       method: 'POST',
       body: formData,
       headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
       signal: controller.signal,
-    })
+    }))
 
     if (!response.ok) {
       let fallback = `Complaint request failed with status ${response.status}.`
@@ -83,3 +84,43 @@ export async function submitComplaint({ description, block, room, photo, accessT
     window.clearTimeout(timeoutId)
   }
 }
+
+/**
+ * Student "My complaints": list, detail, confirm, reopen.
+ * All endpoints require the Supabase bearer token; errors surface the
+ * backend `detail` message (including the rate-limit and state-guard text).
+ */
+async function authedRequest(path, { method = 'GET', body, accessToken } = {}) {
+  if (!accessToken) throw new Error('Sign in as a Student to track your complaints.')
+  const response = await track(fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  }))
+  if (!response.ok) {
+    let fallback = `Request failed with status ${response.status}.`
+    let message = fallback
+    try {
+      message = extractBackendDetail(await response.json(), fallback)
+    } catch {
+      // Non-JSON error body: keep the status-based message.
+    }
+    throw new Error(message)
+  }
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+export const fetchMyComplaints = accessToken => authedRequest('/complaints/mine', { accessToken })
+export const fetchComplaint = (id, accessToken) => authedRequest(`/complaints/${id}`, { accessToken })
+export const confirmComplaint = (id, accessToken) =>
+  authedRequest(`/complaints/${id}/confirm`, { method: 'POST', accessToken })
+export const reopenComplaint = (id, reason, accessToken) =>
+  authedRequest(`/complaints/${id}/reopen`, { method: 'POST', body: { reason }, accessToken })

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def _user_not_found() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Unknown user. Send a valid X-User-Id header.",
+        detail="Sign in with your HostelDesk account to continue.",
     )
 
 

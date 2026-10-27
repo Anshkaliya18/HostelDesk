@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { CheckIcon } from './Icons.jsx'
 
-export default function SuccessState({ reference, status = null, isPreview = false, onReset }) {
+export default function SuccessState({ reference, status = null, isPreview = false, onReset, onTrack }) {
   const headingRef = useRef(null)
 
   useEffect(() => {
@@ -43,6 +43,12 @@ export default function SuccessState({ reference, status = null, isPreview = fal
             ? 'Keep this reference for your records.'
             : 'The hostel office will assign a reference when your complaint is registered.'}
         </p>
+
+        {reference && onTrack ? (
+          <button type="button" className="button button--secondary" onClick={onTrack}>
+            Track this complaint
+          </button>
+        ) : null}
 
         <button type="button" className="button button--secondary" onClick={onReset}>
           Submit another complaint

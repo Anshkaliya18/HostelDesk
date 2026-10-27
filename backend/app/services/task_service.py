@@ -21,7 +21,7 @@ from app.schemas.task import TaskStatusUpdate
 
 logger = logging.getLogger(__name__)
 
-_REVIEWABLE_STATUSES = {ComplaintStatus.SUBMITTED, ComplaintStatus.WARDEN_REVIEW, ComplaintStatus.AI_ANALYZED}
+_REVIEWABLE_status = {ComplaintStatus.SUBMITTED, ComplaintStatus.WARDEN_REVIEW, ComplaintStatus.AI_ANALYZED}
 
 # Allowed task transitions (worker controlled)
 _ALLOWED_TASK_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
@@ -44,7 +44,7 @@ def review_complaint(
     complaint = db.get(Complaint, complaint_id)
     if complaint is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Complaint not found.")
-    if complaint.status not in _REVIEWABLE_STATUSES:
+    if complaint.status not in _REVIEWABLE_status:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             f"Complaint is already in '{complaint.status.value}' and cannot be reviewed again.",

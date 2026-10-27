@@ -33,7 +33,7 @@ app.add_middleware(
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH"],
-    allow_headers=["X-User-Id", "Content-Type", "Accept", "Authorization"],
+    allow_headers=["Content-Type", "Accept", "Authorization"],
 )
 
 app.include_router(warden.router)
@@ -75,7 +75,7 @@ def health() -> JSONResponse:
 
 @app.get("/health/ai", summary="AI service health (configuration only, no API call)")
 def health_ai() -> dict[str, object]:
-    """Reports Gemma/Gemini configuration without calling the API or exposing secrets.
+    """Reports Gemini configuration without calling the API or exposing secrets.
 
     Safe to poll: no network request, no API key, no database URL in the body.
     """
@@ -86,6 +86,8 @@ def health_ai() -> dict[str, object]:
         "configured": bool(settings.gemini_api_key),
         "timeout_seconds": settings.ai_request_timeout_seconds,
         "max_output_tokens": settings.gemini_max_output_tokens,
+        "thinking_budget": 0 if settings.gemini_model.lower().startswith("gemini-2.5") else None,
+        "duplicate_check": True,
     }
 
 
