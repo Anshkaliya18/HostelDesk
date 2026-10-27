@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
+import { API_BASE_URL, readApiJson } from './apiBase.js'
 import { supabase } from './supabase.js'
 import { track } from '../utils/coldStart.js'
 
@@ -12,11 +12,11 @@ async function request(path, options = {}, tokenOverride) {
   }))
   if (!response.ok) {
     let message = `Request failed (${response.status}).`
-    try { const body = await response.json(); if (typeof body.detail === 'string') message = body.detail }
+    try { const body = await readApiJson(response); if (typeof body.detail === 'string') message = body.detail }
     catch { /* retain status fallback */ }
     throw new Error(message)
   }
-  return response.json()
+  return readApiJson(response)
 }
 
 async function signup(path, payload) {
@@ -27,11 +27,11 @@ async function signup(path, payload) {
   }))
   if (!response.ok) {
     let message = `Signup failed (${response.status}).`
-    try { const body = await response.json(); if (typeof body.detail === 'string') message = body.detail }
+    try { const body = await readApiJson(response); if (typeof body.detail === 'string') message = body.detail }
     catch { /* retain status fallback */ }
     throw new Error(message)
   }
-  return response.json()
+  return readApiJson(response)
 }
 
 export const getRoleProfile = token => request('/auth/me', {}, token)

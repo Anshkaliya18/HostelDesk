@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
+import { API_BASE_URL, readApiJson } from './apiBase.js'
 import { supabase } from './supabase.js'
 import { track } from '../utils/coldStart.js'
 
@@ -16,12 +16,12 @@ async function request(path, options = {}) {
     }
     let message = `Request failed (${response.status}).`
     try {
-      const body = await response.json()
+      const body = await readApiJson(response)
       if (typeof body.detail === 'string') message = body.detail
     } catch { /* Keep the status message for non-JSON errors. */ }
     throw new Error(message)
   }
-  return response.json()
+  return readApiJson(response)
 }
 
 export const getDashboard = () => request('/warden/dashboard')

@@ -5,14 +5,11 @@ import SuccessState from './components/SuccessState.jsx'
 import MyComplaints from './components/MyComplaints.jsx'
 import ColdStartBanner from './components/ColdStartBanner.jsx'
 import { warmUp } from './utils/coldStart.js'
+import { API_BASE_URL } from './services/apiBase.js'
 import { RoleGate } from './pages/RoleApp.jsx'
 
 const WardenApp = lazy(() => import('./pages/warden/WardenApp.jsx'))
 const WorkerApp = lazy(() => import('./pages/worker/WorkerApp.jsx'))
-
-// Free-tier API hosting cold starts take a while; this URL must be normalized
-// exactly like the service helpers use it.
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
 
 function StudentDashboard({ session, profile, onSignOut }) {
   const [submission, setSubmission] = useState(null)

@@ -1,4 +1,4 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
+import { API_BASE_URL, readApiJson } from './apiBase.js'
 // The backend persists the complaint row immediately, then classifies and
 // stores the photo while the AI analysis runs in the background, so the
 // client must allow far longer than a plain CRUD call.
@@ -59,19 +59,14 @@ export async function submitComplaint({ description, block, room, photo, accessT
       let fallback = `Complaint request failed with status ${response.status}.`
       let message = fallback
       try {
-        message = extractBackendDetail(await response.json(), fallback)
+        message = extractBackendDetail(await readApiJson(response), fallback)
       } catch {
         // Non-JSON error body: keep the status-based message.
       }
       throw new Error(message)
     }
 
-    let payload = null
-    try {
-      payload = await response.json()
-    } catch {
-      // A successful 204/empty response is valid; no reference is available.
-    }
+    const payload = response.status === 204 ? null : await readApiJson(response)
 
     const record = payload?.data ?? payload ?? {}
     return { reference: extractReference(payload), status: record.status ?? null, isPreview: false }
@@ -105,14 +100,14 @@ async function authedRequest(path, { method = 'GET', body, accessToken } = {}) {
     let fallback = `Request failed with status ${response.status}.`
     let message = fallback
     try {
-      message = extractBackendDetail(await response.json(), fallback)
+      message = extractBackendDetail(await readApiJson(response), fallback)
     } catch {
       // Non-JSON error body: keep the status-based message.
     }
     throw new Error(message)
   }
   try {
-    return await response.json()
+    return await readApiJson(response)
   } catch {
     return null
   }

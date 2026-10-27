@@ -32,7 +32,7 @@ The app sends a `multipart/form-data` request to `POST /complaints`:
 
 The response can be `{ "reference": "..." }`, `{ "id": "..." }`, or a successful response without a reference. If no reference is returned, the success screen shows `Pending`.
 
-Set `VITE_API_BASE_URL` only when the API is deployed on a different origin. The key is public and publishable; never put a service-role key in frontend variables.
+In local development, the blank `VITE_API_BASE_URL` uses Vite's API proxy. Production defaults to `https://hosteldesk-qgx8.onrender.com`; set `VITE_API_BASE_URL` only when deploying against a different FastAPI origin. The Supabase key is public and publishable; never put a service-role key in frontend variables.
 
 Signup is a single step: choose a role, enter a name, email, and password, and the account opens directly into the dashboard. The backend creates a confirmed Supabase Auth account and the matching shared `users` profile in the same request; Worker signup also creates its `workers` profile. The backend assigns trusted `app_metadata`; Student complaints use the authenticated Supabase access token and role-specific API routes enforce linked database roles.
 
@@ -51,15 +51,16 @@ npx wrangler deploy
 
 `wrangler.jsonc` configures the Worker (`hosteldesk`) with `dist/` as the assets directory and single-page-application fallback, so `/student/*`, `/warden/*`, and `/worker/*` routes render the app after a refresh instead of 404ing. One caveat verified live: a hard refresh of a deep-linked warden sub-page (e.g. `/warden/reports`) re-routes to the warden overview once the session is restored — navigate via the sidebar tabs after refreshing.
 
-Set these build-time variables in `frontend/.env` before building:
+Set these Supabase build-time variables in `frontend/.env` before building. `VITE_API_BASE_URL` is optional because the production build defaults to the Render API origin:
 
 ```env
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key>
-VITE_API_BASE_URL=<deployed FastAPI origin>
+# Optional override for a different FastAPI deployment:
+# VITE_API_BASE_URL=https://api.example.com
 ```
 
-They are compiled into the bundle at build time — if any are missing, `createClient` returns `null` and the portal shows "Authentication is not configured." The API base URL is the deployed FastAPI origin on Render. The publishable key is public by design; never put a service-role key in frontend variables. The backend `CORS_ORIGINS` on Render must include the exact deployed frontend origin (`https://hosteldesk.aurio.workers.dev`).
+Supabase values are compiled into the bundle at build time — if either is missing, `createClient` returns `null` and the portal shows "Authentication is not configured." API calls use the FastAPI origin, not the Cloudflare SPA host, to avoid receiving `index.html` where JSON is expected. The publishable key is public by design; never put a service-role key in frontend variables. The backend `CORS_ORIGINS` on Render must include the exact deployed frontend origin (`https://hosteldesk.aurio.workers.dev`).
 
 ## Checks
 
