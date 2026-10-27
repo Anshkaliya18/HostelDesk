@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.security import require_role
 from app.db.database import get_db
-from app.db.models import Complaint, ComplaintStatus, Task, TaskStatus, User, UserRole, Worker
+from app.db.models import AIRecommendation, Complaint, ComplaintStatus, Task, TaskStatus, User, UserRole, Worker
 from app.services import complaint_service, insights_service
 from app.routes.complaints import _list_item
 
@@ -57,8 +57,18 @@ def workers_list(db: Session = Depends(get_db), _warden: User = Depends(require_
 @router.get("/reports", summary="Warden operational report")
 def reports(db: Session = Depends(get_db), _warden: User = Depends(require_role(UserRole.WARDEN))):
     complaints = list(db.execute(select(Complaint)).scalars())
+    # AI_ANALYZED is a transient status (the background worker moves
+    # complaints to WARDEN_REVIEW seconds after submission), so it is never
+    # observable in a report. The meaningful number is how many complaints
+    # actually carry an AI recommendation.
+    ai_analyzed = len(
+        set(
+            db.execute(select(AIRecommendation.complaint_id)).scalars().all()
+        )
+    )
     return {
         "digest": insights_service.build_daily_digest(db),
+        "ai_analyzed": ai_analyzed,
         "by_status": {s.value: sum(c.status == s for c in complaints) for s in ComplaintStatus},
         "by_category": {
             category: sum(c.category is not None and c.category.value == category for c in complaints)
