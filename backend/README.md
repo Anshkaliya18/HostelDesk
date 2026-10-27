@@ -94,9 +94,11 @@ key is never embedded in frontend source.
 | Method | Path | Who | Purpose |
 | --- | --- | --- | --- |
 | GET | `/health` | public | health + database connectivity |
+| GET | `/health/ai` | public | AI service readiness (model + API key status) |
 | GET | `/` | public | welcome message |
 | POST | `/complaints` | student | submit complaint (multipart: `description`, `block`, `room`, optional `photo`) |
 | GET | `/complaints` | warden | complaint queue; optional `status`, `category`, `severity`, `search`, and `sort` filters |
+| GET | `/complaints/mine` | student | only the signed-in student's complaints |
 | GET | `/auth/warden/me` | authenticated Warden | linked Warden profile |
 | GET | `/auth/me` | authenticated role | linked profile and role |
 | POST | `/auth/student/signup` | public | create confirmed Student account and profile |
@@ -133,8 +135,9 @@ categorisation — by design.
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-69 tests cover health, complaint validation, student ownership, Warden auth and
-access-code signup, Warden dashboard/workers/filters,
+74 tests cover AI readiness, complaint validation including separate block/room
+fields, student ownership, Warden auth and single-request signup, Warden
+dashboard/workers/filters,
 worker task ownership, the warden review gate, worker completion, the
 repeat-problem rule, the digest, safe handling of invalid Gemini output,
 storage (validation, safe filenames, fake Supabase client, signed URLs),
@@ -148,8 +151,8 @@ FK integrity, and Alembic upgrade/downgrade reproducibility.
   the backend.
 - Complaint upload succeeds before the row commit; a DB failure after a
   successful Storage upload can leave an orphaned object (acceptable MVP).
-- The React student screen currently sends a combined `room` value; it will
-  need to send the separate `block` + `room` fields expected here.
+- The React student form sends the separate `block` + `room` fields the API
+  expects, matching the multipart contract of `POST /complaints`.
 - `gemma-4-31b-it` returned HTTP 500 (unavailable) for our key during testing;
   `GEMINI_MODEL` is env-configurable and any callable model name works,
   e.g. `gemini-2.5-flash`.

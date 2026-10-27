@@ -100,9 +100,9 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 | Database | Supabase PostgreSQL (with RLS) |
 | Auth | Supabase Auth (role-based signup: Student / Warden / Worker) |
 | Storage | Supabase Storage — private `complaint-photos` bucket |
-| AI | Gemini API (Gemma models, free-tier, server-side REST) |
+| AI | Gemini API (server-side REST, env-configurable model — `gemini-2.5-flash` in production) |
 | Hosting | Cloudflare Workers (frontend static assets) · Render (backend) |
-| Tests | pytest — 69 backend tests |
+| Tests | pytest — 74 backend tests |
 
 ---
 
@@ -121,6 +121,38 @@ Suggested demo walkthrough (one complaint, all three roles):
 ```
 
 > 💡 Open the three roles in separate browser tabs/incognito windows for the smoothest demo.
+
+**Demo accounts on the live site** (also usable by judges):
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Student | `demo.student@hosteldesk.dev` | `DemoStudent2026!` |
+| Warden | `demo.warden@hosteldesk.dev` | `DemoWarden2026!` |
+| Worker | `demo.worker@hosteldesk.dev` | `DemoWorker2026!` |
+
+---
+
+## 📸 Screenshots (from the live deployment)
+
+**Student portal**
+
+![Student login](docs/screenshots/01-student-login.png)
+![Complaint submitted with photo](docs/screenshots/02-student-complaint-success.png)
+
+**Warden portal**
+
+![Warden overview](docs/screenshots/03-warden-dashboard.png)
+![Complaint queue with filters](docs/screenshots/04-warden-queue.png)
+![Review gate — photo, status history, AI recommendation, assignment](docs/screenshots/05-warden-review.png)
+![Reports & insights](docs/screenshots/06-warden-reports.png)
+![Workers availability](docs/screenshots/07-warden-workers.png)
+
+**Worker portal**
+
+![Worker dashboard](docs/screenshots/08-worker-dashboard.png)
+![Assigned tasks](docs/screenshots/09-worker-tasks.png)
+![Task detail](docs/screenshots/10-worker-task-detail.png)
+![Completed task with completion note](docs/screenshots/11-worker-completed.png)
 
 ---
 
@@ -227,7 +259,7 @@ cd backend
 python -m pytest -q
 ```
 
-69 tests cover health, complaint validation & ownership, role-based auth and access-code warden signup, warden dashboard/filters, worker task ownership, the warden review gate, repeat-problem alerts, digest, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
+74 tests cover AI readiness, complaint validation & ownership, role-based auth and single-request role signup, warden dashboard/filters, worker task ownership, the warden review gate, repeat-problem alerts, digest, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
 
 ---
 

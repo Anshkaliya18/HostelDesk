@@ -26,6 +26,7 @@ The app sends a `multipart/form-data` request to `POST /complaints`:
 | Field | Type | Required |
 | --- | --- | --- |
 | `description` | text | yes |
+| `block` | text | yes |
 | `room` | text | yes |
 | `photo` | JPEG file | no |
 
@@ -48,14 +49,14 @@ npm run build
 npx wrangler deploy
 ```
 
-`wrangler.jsonc` configures the Worker (`hosteldesk`) with `dist/` as the assets directory and single-page-application fallback, so `/student/*`, `/warden/*`, and `/worker/*` routes work after refresh.
+`wrangler.jsonc` configures the Worker (`hosteldesk`) with `dist/` as the assets directory and single-page-application fallback, so `/student/*`, `/warden/*`, and `/worker/*` routes render the app after a refresh instead of 404ing. One caveat verified live: a hard refresh of a deep-linked warden sub-page (e.g. `/warden/reports`) re-routes to the warden overview once the session is restored — navigate via the sidebar tabs after refreshing.
 
-`wrangler.jsonc` and `dist/` only — the build-time variables below must be set before building:
+Set these build-time variables in `frontend/.env` before building:
 
 ```env
-VITE_SUPABASE_URL=https://xlhwsuvzcunxschpupdm.supabase.co
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable key>
-VITE_API_BASE_URL=https://hosteldesk-qgx8.onrender.com
+VITE_API_BASE_URL=<deployed FastAPI origin>
 ```
 
 They are compiled into the bundle at build time — if any are missing, `createClient` returns `null` and the portal shows "Authentication is not configured." The API base URL is the deployed FastAPI origin on Render. The publishable key is public by design; never put a service-role key in frontend variables. The backend `CORS_ORIGINS` on Render must include the exact deployed frontend origin (`https://hosteldesk.aurio.workers.dev`).
