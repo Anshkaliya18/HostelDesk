@@ -17,7 +17,7 @@
 
 HostelDesk turns a hostel complaint **photo + one-line note** into a structured, trackable maintenance task:
 
-1. A **Student** uploads a photo of the problem (broken fan, leaking tap…) with a short note
+1. A **Student** uploads a photo of the problem (broken fan, leaking tap·) with a short note
 2. **AI** analyzes the photo + text and suggests a **category**, **severity**, and **worker type**
 3. The **Warden** reviews the AI recommendation, edits if needed, and approves → a task is created .
 4. The assigned **Worker** picks up the task, marks it in-progress, completes it with a note .
@@ -35,20 +35,30 @@ The warden also gets **repeat-problem alerts** and a **daily digest** — no AI 
 ### Student Portal
 - Photo upload (client-side validated, downsized to ≤1600px, re-encoded JPEG, metadata stripped)
 - One-line complaint description + block/room
-- Live complaint status tracking & history .
+- **"My complaints" tracking**: live status timeline auto-refreshes while a complaint is open
+- Complaint completion is confirmed by the student — **"Yes, fixed"** or **reopen with a reason** (the warden re-reviews)
+- Duplicate-block suggestions and rate limits protect the queue from spam
 
 ### Warden Portal
-- Complete complaint queue with filters (status / category / severity / search / sort)
-- AI-generated category, severity & suggested worker
-- **Approve or edit** AI recommendations before any assignment
-- Repeat-problem alerts (deterministic rule: same block + category recurring complaints)
-- Daily digest + worker workload overview .
+- Complaint queue with filters (status / category / severity / search / block / sort), result counts, removable active-filter chips, and a debounced search
+- Keyboard-accessible complaint review actions, distinct priority/status badges, and a responsive review layout
+- **Needs-review quick filter + "oldest unreviewed first" sort**
+- AI-generated category, severity & suggested worker, with **reason, confidence, and repeat-complaint flags**
+- **Approve AI suggestion** (one click — the warden still presses the button) or edit any field
+- Matching-trade workers listed first, sorted by fewest active tasks; **Re-run AI** when a first pass failed
+- Red **Safety risk** badge whenever the AI flags a hazard (auto-escalates severity to HIGH)
+- Repeat-problem alerts (deterministic rule: same block + category recurring complaints) — clickable through to the filtered queue
+- Daily digest report with a UTC date selector, deterministic counters, category mix, hotspots, oldest open complaint, and active alerts
+- Copy or download a plain-text digest to share with the hostel team
 
 ### Worker Portal
-- Assigned tasks, complaint details
-- ASSIGNED → IN_PROGRESS → COMPLETED workflow with completion notes
+- Responsive assignment dashboard with counts and Open / To start / Completed / All queue filters
+- Complaint detail, location, priority, assignment time, and progress history
+- ASSIGNED → IN_PROGRESS → COMPLETED workflow with a completion note required to close a job
+- Worker and Warden portals load as separate frontend chunks and share the portal stylesheet
 
-### AI Engine (Gemini / Gemma, server-side only)
+### AI Engine (Gemini 2.5, server-side only)
+- Default model `gemini-2.5-flash` with `gemini-2.5-flash-lite` fallback (thinking budget disabled, strict JSON response schema; Gemma 4 remains a one-line config swap)
 - Categories: **Electrical · Plumbing · Cleaning · Furniture**
 - Severity: **Low · Medium · High**
 - Worker suggestions: **Electrician · Plumber · Cleaner · Carpenter**
@@ -69,16 +79,16 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 ```text
               https://hosteldesk.aurio.workers.dev
               Student  ·  Warden  ·  Worker (React SPA)
-                            │ HTTPS
-                            ▼
+                            ” HTTPS
+                            –
               https://hosteldesk-qgx8.onrender.com
               FastAPI (auth, complaints, tasks, digest)
-               │            │              │
-               ▼            ▼              ▼
-      Supabase Auth   Supabase Postgres   Gemini/Gemma API
+               ”            ”              ”
+               –            –              –
+      Supabase Auth   Supabase Postgres   Gemini API (2.5 Flash)
       (email+token)   (RLS-protected)     (classification)
-               │            │
-               ▼            ▼
+               ”            ”
+               –            –
       Private Storage  Alembic migrations
       (complaint photos)
 ```
@@ -102,22 +112,27 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 | Storage | Supabase Storage — private `complaint-photos` bucket |
 | AI | Gemini API (server-side REST, env-configurable model — `gemini-2.5-flash` in production) |
 | Hosting | Cloudflare Workers (frontend static assets) · Render (backend) |
-| Tests | pytest — 74 backend tests |
+| Tests | pytest — 113 backend tests |
 
 ---
 
 ## Try the live demo
 
-**Sign up directly on the live site** — registration is a single step (choose a role → name, email, password → dashboard opens). No email confirmation needed.
+**Sign up directly on the live site** — Student registration is a single step (choose a role → name, email, password → dashboard opens). No email confirmation needed. Warden/Worker signups additionally require the staff invite code configured on the server (judges can simply use the demo accounts below).
+
+**Staff invite codes:** Warden and Worker signup use the same server-side `STAFF_INVITE_CODE`. The code is never sent in frontend configuration. For the current local development invite, ask the project owner; do not copy a live or local invite into this README or commit it.
 
 Suggested demo walkthrough (one complaint, all three roles):
 
 ```text
-1. Sign up as Student      → upload a photo of a broken fan + short note
-2. Sign up as Warden       → see the complaint AI-tagged ELECTRICAL / HIGH / Electrician → approve
-3. Sign up as Worker       → electrician sees the task → mark In Progress → Complete with note
-4. Back in the Student tab → status shows COMPLETED
-5. Warden                  → check repeat-problem alerts + daily digest
+1. Sign in as Student      → submit a photo of a broken fan + a short note
+2. Student                 → "My complaints": watch the status timeline update live
+3. Sign in as Warden       → the complaint arrives AI-tagged (ELECTRICAL / HIGH / Electrician)
+                             with reason + confidence → "Approve AI suggestion"
+4. Sign in as Worker       → electrician sees the task → Start work → Complete (note required)
+5. Back in the Student tab → COMPLETED → "Track this complaint" → "Yes, fixed"
+                             (or "Not fixed" with a reason — the warden re-reviews)
+6. Warden → Reports        → repeat-problem alerts, hotspots, daily digest + "Copy digest"
 ```
 
 > Tip: open the three roles in separate browser tabs/incognito windows for the smoothest demo..
@@ -170,23 +185,24 @@ Suggested demo walkthrough (one complaint, all three roles):
 .
 ```text
 HostelDesk/
-│
-├── frontend/            # React app (all three role portals)
-│   ├── src/pages/       #   Student / Warden / Worker screens
-│   ├── src/services/    #   Supabase + API clients
-│   ├── wrangler.jsonc   #   Cloudflare Workers static-assets deploy
-│   └── .env.example     #   Vite build-time environment template
-│
-├── backend/             # FastAPI service
-│   ├── app/             #   routes, services, schemas, db, core
-│   ├── alembic/         #   DB migrations (incl. RLS policy migration)
-│   ├── tests/           #   74 pytest tests
-│   ├── seed.py          #   demo data seeder
-│   └── .env.example     #   full backend environment template
-│
-├── docs/screenshots/    # live-deployment screenshots used above
-├── Readme.md            # this file
-└── LICENSE              # MIT
+”
+””·”· frontend/            # React app (all three role portals)
+”   ””·”· src/pages/       #   Student / Warden / Worker screens
+”   ””·”· src/services/    #   Supabase + API clients
+”   ””·”· wrangler.jsonc   #   Cloudflare Workers static-assets deploy
+”   ”””·”· .env.example     #   Vite build-time environment template
+”
+””·”· backend/             # FastAPI service
+”   ””·”· app/             #   routes, services, schemas, db, core
+”   ””·”· alembic/         #   DB migrations (incl. RLS policy migration)
+”   ””·”· tests/           #   113 pytest tests
+”   ””·”· seed.py          #   demo data seeder (empty-DB seeding)
+”   ””·”· scripts/seed_demo.py   # judge-ready demo dataset + photos (see below)
+”   ”””·”· .env.example     #   full backend environment template
+”
+””·”· docs/screenshots/    # live-deployment screenshots used above
+””·”· Readme.md            # this file
+”””·”· LICENSE              # MIT
 ```
 
 ---
@@ -202,8 +218,12 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env              # then fill in your keys (see below)
 
+# Generate a private code, then paste it into backend/.env as STAFF_INVITE_CODE=...
+# python -c "import secrets; print('HD-' + secrets.token_urlsafe(18))"
+
 python -m alembic upgrade head      # create tables
-python seed.py                      # optional demo data
+python seed.py                      # optional base demo data
+.venv\Scripts\python.exe scripts\seed_demo.py   # judge-ready demo dataset + photos (demo_assets/)
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -235,8 +255,12 @@ DATABASE_URL=postgresql+psycopg2://<role>:<password>@<host>:5432/postgres
 SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<server-side only — never in the browser>
 GEMINI_API_KEY=<google ai studio key>
+STAFF_INVITE_CODE=<your-private-random-code>
 CORS_ORIGINS=http://localhost:5173,https://hosteldesk.aurio.workers.dev
 ```
+
+Model names, rate limits (complaints + signups) and severity SLAs all have sensible defaults and can be overridden — see the commented template.
+The signup limit defaults to 10 attempts per hour per client IP and is held in memory by the API process. During local development, restarting FastAPI clears that process-local counter. It does not reset any separate Supabase Auth limits. Set `STAFF_INVITE_CODE` to the same value you enter on either staff signup form; restart FastAPI after changing it.
 
 **Frontend (`frontend/.env.local`) — all three build-time vars are required:**
 
@@ -270,7 +294,7 @@ cd backend
 python -m pytest -q
 ```
 
-74 tests cover AI readiness, complaint validation & ownership, role-based auth and single-request role signup, warden dashboard/filters, worker task ownership, the warden review gate, repeat-problem alerts, digest, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
+113 tests cover AI readiness (including malformed output, duplicate-check prompts, the Gemini 2.5 request shape), complaint validation & ownership, role-based auth, staff invite codes, rate limits, the student confirm/reopen loop, warden dashboard/filters (including block + needs-review), worker task ownership, the warden review gate, repeat-problem alerts (incl. submission-time detection), digest + severity-based SLA, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
 
 ---
 
@@ -292,6 +316,30 @@ This repo was built with separate workstream branches, now merged into `main`:
 | `feature/student` | student UI + complaint flow |
 | `feature/warden-ai` | AI integration + warden dashboard |
 | `feature/backend-worker` | backend, database, worker workflow, insights |
+
+---
+
+## For judges
+
+**The one-sentence version:** HostelDesk is an AI-assisted hostel complaint desk where **the AI suggests and people decide** — a warden explicitly approves every assignment, a student explicitly confirms every fix.
+
+**Model:** the backend calls Google's **Gemini 2.5 Flash** through the server-side Generative Language REST API, with `gemini-2.5-flash-lite` as an automatic fallback. Thinking budget is disabled and the reply is forced to a strict JSON schema, so classification is fast and structurally validated. Gemma-only deployments remain a one-line config swap (`GEMINI_MODEL`) once API-side Gemma 4 access is available.
+
+**"AI suggests, people decide" is enforced in code, not copy:**
+- The AI only ever writes a *recommendation row* (category / severity / trade / reason / confidence / possible duplicate). It cannot assign workers, change ownership, or close complaints.
+- A warden must press a button that submits their own review before any task exists.
+- A student must confirm "Yes, fixed" before the loop is considered closed, and can reopen with a reason.
+
+**Known limitations (honest list):**
+- No push notifications or SMS — the student portal polls while a complaint is open, and the warden digest is in-app/copyable.
+- Rate limiting and the digest AI-polish cache are in-memory per backend process (fine for one Render instance; needs Redis for horizontal scale).
+- Single-hostel deployment: one tenant, blocks A–F assumption in UI hints only.
+- AI covers the 4 maintenance trades; other problem types fall through to manual warden categorization.
+- The AI's duplicate detector only sees the 5 most recent open complaints in the same block.
+
+**2-minute demo script:** submit a photo complaint as the demo student → watch "My complaints" tick over → approve the AI suggestion as the warden (show reason + confidence + the "safety risk" escalation on an exposed-wiring photo) → complete the job as the worker → the student confirms "Yes, fixed" → warden Reports page shows repeat-problem alerts, hotspots, and the copyable daily digest.
+
+**If something breaks live:** if Gemini is down or returns malformed output, complaints land safely in `WARDEN_REVIEW` with an "AI unavailable" note, the warden can hit **Re-run AI**, or simply assign manually — the product never blocks on the model.
 
 ---
 
