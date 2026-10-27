@@ -1,27 +1,27 @@
-# 🛏️ HostelDesk
+# HostelDesk
 
 > **AI-assisted hostel complaint & maintenance desk — AI suggests, the Warden decides.**
 
-🌐 **[Live Demo → https://hosteldesk.aurio.workers.dev](https://hosteldesk.aurio.workers.dev/)**
+**Live Demo → https://hosteldesk.aurio.workers.dev**
 
 | Deployment | URL | Status |
 | --- | --- | --- |
-| **Frontend (Student / Warden / Worker portals)** | [hosteldesk.aurio.workers.dev](https://hosteldesk.aurio.workers.dev/) | 🟢 Live on Cloudflare Workers |
-| **Backend API (FastAPI)** | [hosteldesk-qgx8.onrender.com](https://hosteldesk-qgx8.onrender.com/) | 🟢 Live on Render |
-| **API Docs (Swagger)** | [hosteldesk-qgx8.onrender.com/docs](https://hosteldesk-qgx8.onrender.com/docs) | 🟢 Live |
-| **Database & Auth & Storage** | Supabase (PostgreSQL + Auth + private Storage bucket) | 🟢 Live |
+| **Frontend (Student / Warden / Worker portals)** | [hosteldesk.aurio.workers.dev](https://hosteldesk.aurio.workers.dev/) | Live on Cloudflare Workers |
+| **Backend API (FastAPI)** | [hosteldesk-qgx8.onrender.com](https://hosteldesk-qgx8.onrender.com/) | Live on Render |
+| **API Docs (Swagger)** | [hosteldesk-qgx8.onrender.com/docs](https://hosteldesk-qgx8.onrender.com/docs) | Live |
+| **Database & Auth & Storage** | Supabase (PostgreSQL + Auth + private Storage bucket) | Live |
 
 ---
 
-## 🎬 What it does
+## What it does
 
 HostelDesk turns a hostel complaint **photo + one-line note** into a structured, trackable maintenance task:
 
-1. 📸 A **Student** uploads a photo of the problem (broken fan, leaking tap…) with a short note
-2. 🤖 **AI** analyzes the photo + text and suggests a **category**, **severity**, and **worker type**
-3. 🧑‍💼 The **Warden** reviews the AI recommendation, edits if needed, and approves → a task is created
-4. 🔧 The assigned **Worker** picks up the task, marks it in-progress, completes it with a note
-5. 📱 The **Student** sees live status updates end-to-end
+1. A **Student** uploads a photo of the problem (broken fan, leaking tap…) with a short note
+2. **AI** analyzes the photo + text and suggests a **category**, **severity**, and **worker type**
+3. The **Warden** reviews the AI recommendation, edits if needed, and approves → a task is created
+4. The assigned **Worker** picks up the task, marks it in-progress, completes it with a note
+5. The **Student** sees live status updates end-to-end
 
 The warden also gets **repeat-problem alerts** and a **daily digest** — no AI required for those, just deterministic rules.
 
@@ -30,7 +30,7 @@ The warden also gets **repeat-problem alerts** and a **daily digest** — no AI 
 
 ---
 
-## 🧩 Key Features
+## Key Features
 
 ### Student Portal
 - Photo upload (client-side validated, downsized to ≤1600px, re-encoded JPEG, metadata stripped)
@@ -56,7 +56,7 @@ The warden also gets **repeat-problem alerts** and a **daily digest** — no AI 
 
 ---
 
-## 🔄 Complaint Lifecycle
+## Complaint Lifecycle
 
 ```text
 SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COMPLETED
@@ -64,7 +64,7 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```text
               https://hosteldesk.aurio.workers.dev
@@ -91,7 +91,7 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Tech |
 | --- | --- |
@@ -106,7 +106,7 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 
 ---
 
-## 🧪 Try the live demo
+## Try the live demo
 
 **Sign up directly on the live site** — registration is a single step (choose a role → name, email, password → dashboard opens). No email confirmation needed.
 
@@ -120,7 +120,7 @@ Suggested demo walkthrough (one complaint, all three roles):
 5. Warden                  → check repeat-problem alerts + daily digest
 ```
 
-> 💡 Open the three roles in separate browser tabs/incognito windows for the smoothest demo.
+> Tip: open the three roles in separate browser tabs/incognito windows for the smoothest demo.
 
 **Demo accounts on the live site** (also usable by judges):
 
@@ -132,31 +132,41 @@ Suggested demo walkthrough (one complaint, all three roles):
 
 ---
 
-## 📸 Screenshots (from the live deployment)
+## Screenshots (from the live deployment)
 
-**Student portal**
+### Student portal
 
-![Student login](docs/screenshots/01-student-login.png)
-![Complaint submitted with photo](docs/screenshots/02-student-complaint-success.png)
+| Login | Complaint submitted with photo |
+| --- | --- |
+| <img src="docs/screenshots/01-student-login.png" width="420" alt="Student login"> | <img src="docs/screenshots/02-student-complaint-success.png" width="420" alt="Complaint submitted success screen"> |
 
-**Warden portal**
+### Warden portal
 
-![Warden overview](docs/screenshots/03-warden-dashboard.png)
-![Complaint queue with filters](docs/screenshots/04-warden-queue.png)
-![Review gate — photo, status history, AI recommendation, assignment](docs/screenshots/05-warden-review.png)
-![Reports & insights](docs/screenshots/06-warden-reports.png)
-![Workers availability](docs/screenshots/07-warden-workers.png)
+| Overview | Complaint queue with filters |
+| --- | --- |
+| <img src="docs/screenshots/03-warden-dashboard.png" width="420" alt="Warden overview dashboard"> | <img src="docs/screenshots/04-warden-queue.png" width="420" alt="Complaint queue with filters"> |
 
-**Worker portal**
+| Review gate | Reports and insights |
+| --- | --- |
+| <img src="docs/screenshots/05-warden-review.png" width="420" alt="Review gate - photo, status history, AI recommendation, assignment"> | <img src="docs/screenshots/06-warden-reports.png" width="420" alt="Reports and insights"> |
 
-![Worker dashboard](docs/screenshots/08-worker-dashboard.png)
-![Assigned tasks](docs/screenshots/09-worker-tasks.png)
-![Task detail](docs/screenshots/10-worker-task-detail.png)
-![Completed task with completion note](docs/screenshots/11-worker-completed.png)
+<p align="center">
+  <img src="docs/screenshots/07-warden-workers.png" width="420" alt="Workers availability">
+</p>
+
+### Worker portal
+
+| Dashboard | Assigned tasks |
+| --- | --- |
+| <img src="docs/screenshots/08-worker-dashboard.png" width="420" alt="Worker dashboard"> | <img src="docs/screenshots/09-worker-tasks.png" width="420" alt="Assigned tasks"> |
+
+| Task detail | Completed with note |
+| --- | --- |
+| <img src="docs/screenshots/10-worker-task-detail.png" width="420" alt="Task detail"> | <img src="docs/screenshots/11-worker-completed.png" width="420" alt="Completed task with completion note"> |
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 HostelDesk/
@@ -170,17 +180,18 @@ HostelDesk/
 ├── backend/             # FastAPI service
 │   ├── app/             #   routes, services, schemas, db, core
 │   ├── alembic/         #   DB migrations (incl. RLS policy migration)
-│   ├── tests/           #   69 pytest tests
+│   ├── tests/           #   74 pytest tests
 │   ├── seed.py          #   demo data seeder
 │   └── .env.example     #   full backend environment template
 │
+├── docs/screenshots/    # live-deployment screenshots used above
 ├── Readme.md            # this file
 └── LICENSE              # MIT
 ```
 
 ---
 
-## 🚀 Run it locally
+## Run it locally
 
 ### 1. Backend (FastAPI)
 
@@ -213,7 +224,7 @@ The dev proxy forwards API calls to `127.0.0.1:8000`.
 
 ---
 
-## 🔐 Environment Variables
+## Environment Variables
 
 Full templates with comments live in [`backend/.env.example`](backend/.env.example) and [`frontend/.env.example`](frontend/.env.example).
 
@@ -235,11 +246,11 @@ VITE_SUPABASE_PUBLISHABLE_KEY=<public publishable key>
 VITE_API_BASE_URL=https://hosteldesk-qgx8.onrender.com
 ```
 
-> ⚠️ **Never** commit real `.env` files, put the service-role key in frontend code, or upload real student records.
+> **Never** commit real `.env` files, put the service-role key in frontend code, or upload real student records.
 
 ---
 
-## ☁️ Deployment (how this repo is hosted)
+## Deployment (how this repo is hosted)
 
 - **Frontend → Cloudflare Workers** (static assets, SPA fallback so `/warden/*` routes survive refresh):
   ```bash
@@ -252,7 +263,7 @@ VITE_API_BASE_URL=https://hosteldesk-qgx8.onrender.com
 
 ---
 
-## 🧪 Tests
+## Tests
 
 ```bash
 cd backend
@@ -263,7 +274,7 @@ python -m pytest -q
 
 ---
 
-## 🌱 MVP Scope & What's Next
+## MVP Scope & What's Next
 
 **In the MVP:** student submission with photo, AI classification (photo + text), warden review gate, worker assignment & completion, student status tracking, repeat-problem alerts, daily digest.
 
@@ -271,7 +282,7 @@ python -m pytest -q
 
 ---
 
-## 🗂️ Branches
+## Branches
 
 This repo was built with separate workstream branches, now merged into `main`:
 
@@ -284,13 +295,13 @@ This repo was built with separate workstream branches, now merged into `main`:
 
 ---
 
-## 🔒 Privacy & Security Notes
+## Privacy & Security Notes
 
 - Use fake/demo data only
 - All API keys stay server-side (backend `.env` / Render env vars)
 - AI input/output is validated; the warden stays in the decision loop
 - Strict file validation on every photo upload
 
-## 📄 License
+## License
 
 MIT — see [`LICENSE`](LICENSE).
