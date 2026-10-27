@@ -61,9 +61,10 @@ WhatsApp-ready plain text), but we kept the core in one place we can test.
 - Rate limits: 5 complaints per 10 minutes and 20 per day per student; 10
   signups per hour per IP; staff signup additionally needs a server-side
   invite code.
-- Warden and Worker signup share `STAFF_INVITE_CODE`; it belongs in the
-  backend environment only, never in frontend variables or committed docs.
-  A wrong code is still a signup attempt and counts toward the per-IP limit.
+- Warden and Worker signup use role-specific `WARDEN_SIGNUP_CODE` and
+  `WORKER_SIGNUP_CODE` values when configured, with `STAFF_INVITE_CODE` as a
+  shared fallback. These are backend-only values; a wrong code still counts
+  toward the per-IP limit.
 - The signup limiter is in-memory per API process. Restarting the local API
   clears its local counter; hosted Supabase Auth limits are separate.
 - The model is anchored with a strict prompt ("answer only from the photo,
@@ -82,17 +83,19 @@ WhatsApp-ready plain text), but we kept the core in one place we can test.
   advisory AI recommendation and explicit worker assignment/review controls.
   The review panel moves below the report on narrow screens.
 - **Warden reports:** choose a UTC report date, inspect deterministic daily
-  counts and category/hotspot/oldest-open views, then copy or download the
-  digest as plain text.
+  counts in a fixed Activity / Queue / Patterns summary, then review new
+  reports by category, delayed reviews, overdue tasks, and 30-day hotspots.
+  Copy or download the digest as a clearly sectioned text report.
 - **Worker dashboard:** open, to-start, completed, and all-task filters;
   assignment counts; task detail/history; and a required completion note.
   Warden and Worker pages share a lazily loaded portal stylesheet so direct
   Worker navigation receives the same responsive layout.
 
-For local staff signup, set `STAFF_INVITE_CODE` in `backend/.env` and restart
-FastAPI after changing it. Use that same value in either the Warden or Worker
-signup form. Never commit the active invite code; set a separate secret in the
-hosting provider for deployment.
+For local judge signup testing, use **`HOSTELDESK-JUDGE-LOCAL-ONLY`**. Set
+`STAFF_INVITE_CODE=HOSTELDESK-JUDGE-LOCAL-ONLY` in `backend/.env`, leave
+`WARDEN_SIGNUP_CODE` and `WORKER_SIGNUP_CODE` blank, and restart FastAPI. This
+sample is local-only and will not match the private production role codes.
+Never use it in a hosted environment or replace the production secrets with it.
 
 ## Student confirmation: why the loop
 

@@ -50,17 +50,29 @@ function Metric({ label, value, tone }) {
 function digestText(digest) {
   const categories = Object.entries(digest.category_counts || {}).filter(([, count]) => count > 0)
   const lines = [
-    `HostelDesk daily digest — ${digest.date}`,
-    `Summary source: ${digest.generated_by === 'ai' ? 'AI-assisted wording' : 'Deterministic rules'}`,
+    `HOSTELDESK DAILY DIGEST · ${digest.date}`,
+    `Summary: ${digest.generated_by === 'ai' ? 'AI-assisted' : 'rules-based'}`,
     '',
+    'OVERVIEW',
     digest.summary,
     '',
-    `Open: ${digest.open_complaints} | Waiting for review: ${digest.stale_review} | Overdue: ${digest.overdue_complaints} | Completed today: ${digest.completed_complaints} | Repeat issues: ${digest.recurring_issues}`,
+    'KEY COUNTS',
+    `New reports: ${digest.submitted_today ?? categories.reduce((total, [, count]) => total + count, 0)}`,
+    `Open complaints: ${digest.open_complaints}`,
+    `Reviews delayed: ${digest.stale_review}`,
+    `Tasks overdue: ${digest.overdue_complaints}`,
+    `Completed today: ${digest.completed_complaints}`,
+    `Active repeat alerts: ${digest.recurring_issues}`,
   ]
-  if (categories.length) lines.push('', 'New reports by category:', ...categories.map(([name, count]) => `- ${human(name)}: ${count}`))
-  if (digest.hotspots?.length) lines.push('', '30-day hotspots:', ...digest.hotspots.map(item => `- ${item.block} Block · ${human(item.category)} · ${item.count} reports`))
-  if (digest.oldest_open) lines.push('', `Oldest open complaint: #${digest.oldest_open.id} · Block ${digest.oldest_open.block}, Room ${digest.oldest_open.room} · ${Math.round(digest.oldest_open.age_hours)} hours open`)
-  if (digest.highlights?.length) lines.push('', 'Highlights:', ...digest.highlights.map(item => `- ${item}`))
+  lines.push('', 'NEW REPORTS BY CATEGORY')
+  if (categories.length) lines.push(...categories.map(([name, count]) => `- ${human(name)}: ${count}`))
+  else lines.push('No new reports for this date.')
+  lines.push('', 'NEEDS ATTENTION')
+  if (digest.oldest_open) lines.push(`Oldest open: Complaint #${digest.oldest_open.id} · ${digest.oldest_open.block} Block, Room ${digest.oldest_open.room} · ${Math.round(digest.oldest_open.age_hours)} hours`)
+  else lines.push('No open complaints.')
+  lines.push('', 'RECURRING HOTSPOTS · LAST 30 DAYS')
+  if (digest.hotspots?.length) lines.push(...digest.hotspots.map(item => `- ${item.block} Block · ${human(item.category)} · ${item.count} reports`))
+  else lines.push('No recurring hotspots detected.')
   return lines.join('\n')
 }
 
@@ -107,34 +119,37 @@ export function DigestCard({ digest, compact = false, onOpenAlert, onOpenComplai
   return <section className={`warden-card digest-card${compact ? ' digest-card--compact' : ''}`} aria-labelledby="digest-title">
     <div className="digest-head">
       <div className="digest-title-group">
-        <p className="digest-eyebrow">Daily operations briefing</p>
-        <h2 id="digest-title">{compact ? 'Today’s digest' : 'Daily digest report'}</h2>
+        <p className="digest-eyebrow">{compact ? 'At a glance' : 'Warden report'}</p>
+        <h2 id="digest-title">{compact ? 'Today’s briefing' : 'Daily digest'}</h2>
+        <span className="digest-date">{digest.date} · UTC</span>
       </div>
       <span className={`digest-source ${digest.generated_by === 'ai' ? 'digest-source--ai' : ''}`}>
         <span aria-hidden="true" />{digest.generated_by === 'ai' ? 'AI-assisted summary' : 'Rules-based summary'}
       </span>
-      <div className="digest-actions">
+      {!compact && <div className="digest-actions">
         <button type="button" className="button button--secondary" onClick={handleCopy}>Copy</button>
         <button type="button" className="button button--secondary" onClick={handleDownload}>Download .txt</button>
-      </div>
+      </div>}
     </div>
 
     <div className="digest-summary-block">
-      <span className="digest-summary-label">Executive summary</span>
+      <span className="digest-summary-label">Daily summary</span>
       <p className="digest-summary">{digest.summary}</p>
     </div>
 
+    <div className="digest-kpis-heading"><span>Key counts</span><small>For {digest.date} UTC</small></div>
     <div className="digest-kpis" aria-label="Daily digest metrics">
-      <div><span>Open</span><strong>{digest.open_complaints}</strong></div>
-      <div className={digest.stale_review ? 'is-attention' : ''}><span>Review waiting</span><strong>{digest.stale_review}</strong></div>
-      <div className={digest.overdue_complaints ? 'is-danger' : ''}><span>Overdue</span><strong>{digest.overdue_complaints}</strong></div>
+      {!compact && <div><span>New reports</span><strong>{digest.submitted_today ?? categories.reduce((total, [, count]) => total + count, 0)}</strong></div>}
+      <div><span>Open complaints</span><strong>{digest.open_complaints}</strong></div>
+      <div className={digest.stale_review ? 'is-attention' : ''}><span>Reviews delayed</span><strong>{digest.stale_review}</strong></div>
+      <div className={digest.overdue_complaints ? 'is-danger' : ''}><span>Tasks overdue</span><strong>{digest.overdue_complaints}</strong></div>
       <div className="is-positive"><span>Completed today</span><strong>{digest.completed_complaints}</strong></div>
-      <div><span>Repeat issues</span><strong>{digest.recurring_issues}</strong></div>
+      {!compact && <div><span>Active repeat alerts</span><strong>{digest.recurring_issues}</strong></div>}
     </div>
 
     {!compact && <div className="digest-insights-grid">
       <section className="digest-insight-panel" aria-labelledby="digest-category-title">
-        <div className="digest-section-heading"><div><p className="digest-eyebrow">New submissions</p><h3 id="digest-category-title">Category mix</h3></div><span>{categories.reduce((total, [, count]) => total + count, 0)} reports</span></div>
+        <div className="digest-section-heading"><div><p className="digest-eyebrow">Activity</p><h3 id="digest-category-title">New reports by category</h3></div><span>{digest.submitted_today ?? categories.reduce((total, [, count]) => total + count, 0)} reports</span></div>
         {categories.length ? <div className="digest-category-list">{categories.map(([category, count]) => <div className="digest-category-row" key={category}>
           <div className="digest-category-label"><span>{human(category)}</span><strong>{count}</strong></div>
           <div className="digest-bar" aria-label={`${count} ${human(category)} reports`}><span style={{ width: `${Math.max(4, (count / categoryMaximum) * 100)}%` }} /></div>
@@ -142,18 +157,21 @@ export function DigestCard({ digest, compact = false, onOpenAlert, onOpenComplai
       </section>
 
       <section className="digest-insight-panel" aria-labelledby="digest-focus-title">
-        <div className="digest-section-heading"><div><p className="digest-eyebrow">Needs attention</p><h3 id="digest-focus-title">Operations focus</h3></div></div>
+        <div className="digest-section-heading"><div><p className="digest-eyebrow">Follow-up</p><h3 id="digest-focus-title">Needs attention</h3></div></div>
         {digest.oldest_open ? <button type="button" className="digest-oldest" onClick={() => onOpenComplaint?.(digest.oldest_open.id)}>
-          <span className="digest-oldest__label">Oldest open report · {Math.round(digest.oldest_open.age_hours)}h</span>
+          <span className="digest-oldest__label">Oldest open · {Math.round(digest.oldest_open.age_hours)}h</span>
           <strong>Complaint #{digest.oldest_open.id}</strong>
           <span>Block {digest.oldest_open.block}, Room {digest.oldest_open.room}</span>
           <small>Open complaint →</small>
         </button> : <p className="digest-empty">No open complaints. The queue is clear.</p>}
-        {digest.highlights?.length ? <ul className="digest-highlights">{digest.highlights.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul> : null}
+        <div className="digest-attention-counts">
+          <span className={digest.stale_review ? 'is-attention' : ''}><strong>{digest.stale_review}</strong> delayed reviews</span>
+          <span className={digest.overdue_complaints ? 'is-danger' : ''}><strong>{digest.overdue_complaints}</strong> overdue tasks</span>
+        </div>
       </section>
 
       <section className="digest-insight-panel digest-insight-panel--wide" aria-labelledby="digest-hotspots-title">
-        <div className="digest-section-heading"><div><p className="digest-eyebrow">Last 30 days</p><h3 id="digest-hotspots-title">Recurring hotspots</h3></div><span>Top {digest.hotspots?.length || 0}</span></div>
+        <div className="digest-section-heading"><div><p className="digest-eyebrow">Pattern watch · 30 days</p><h3 id="digest-hotspots-title">Recurring hotspots</h3></div><span>Top {digest.hotspots?.length || 0}</span></div>
         {digest.hotspots?.length ? <div className="digest-hotspots">{digest.hotspots.map((item, index) => <button type="button" className="digest-hotspot" key={`${item.block}-${item.category}`} onClick={() => onOpenAlert?.({ block: item.block, category: item.category })}>
           <span className="digest-hotspot__rank">0{index + 1}</span>
           <span className="digest-hotspot__copy"><strong>{item.block} Block · {human(item.category)}</strong><small>Recurring reports in this area</small></span>
@@ -161,7 +179,7 @@ export function DigestCard({ digest, compact = false, onOpenAlert, onOpenComplai
         </button>)}</div> : <p className="digest-empty">No recurring hotspots detected in the last 30 days.</p>}
       </section>
     </div>}
-    <div className="digest-footer"><span>Report date · {digest.date} UTC</span><span>Counts are deterministic; AI only rephrases the summary.</span></div>
+    <div className="digest-footer"><span>Counts and groupings come from complaint records.</span><span>{digest.generated_by === 'ai' ? 'AI only rewrites the summary.' : 'Summary generated from report rules.'}</span></div>
     {notice && <p className="digest-notice" role="status">{notice}</p>}
   </section>
 }

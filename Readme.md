@@ -120,7 +120,7 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 
 **Sign up directly on the live site** — Student registration is a single step (choose a role → name, email, password → dashboard opens). No email confirmation needed. Warden/Worker signups additionally require the staff invite code configured on the server (judges can simply use the demo accounts below).
 
-**Staff invite codes:** Warden and Worker signup use the same server-side `STAFF_INVITE_CODE`. The code is never sent in frontend configuration. For the current local development invite, ask the project owner; do not copy a live or local invite into this README or commit it.
+**Local judge signup test code:** `HOSTELDESK-JUDGE-LOCAL-ONLY`. This sample is for a local backend only. Set `STAFF_INVITE_CODE=HOSTELDESK-JUDGE-LOCAL-ONLY` in `backend/.env`, leave `WARDEN_SIGNUP_CODE` and `WORKER_SIGNUP_CODE` blank, and restart FastAPI. Role-specific codes override the shared code. This sample is not a production invite; live invite codes remain private in the hosting environment.
 
 Suggested demo walkthrough (one complaint, all three roles):
 
@@ -218,7 +218,9 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env              # then fill in your keys (see below)
 
-# Generate a private code, then paste it into backend/.env as STAFF_INVITE_CODE=...
+# Optional: for local judge signup testing only, use the documented
+# HOSTELDESK-JUDGE-LOCAL-ONLY code; keep role-specific codes blank.
+# For your own local invite instead, generate one with:
 # python -c "import secrets; print('HD-' + secrets.token_urlsafe(18))"
 
 python -m alembic upgrade head      # create tables

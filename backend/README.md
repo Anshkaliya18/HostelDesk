@@ -137,7 +137,7 @@ put a real code in source control, screenshots, or public docs.
 | GET | `/tasks/my` | worker | only their assigned tasks |
 | PATCH | `/tasks/{id}/status` | worker | ASSIGNED → IN_PROGRESS → COMPLETED (+ note) |
 | GET | `/alerts` | warden | active repeat-problem alerts (deterministic rule) |
-| GET | `/digest` | warden | daily summary (no AI) |
+| GET | `/digest` | warden | deterministic daily counts with an optional AI-polished Activity / Queue / Patterns summary |
 
 Photos are uploaded once at complaint-creation time, stored privately under
 `complaints/{complaint_id}/{uuid}.{ext}`, and the DB keeps only that key.
@@ -152,7 +152,8 @@ See `.env.example`. Key settings: `DATABASE_URL`, `SUPABASE_URL`,
 
 Without `GEMINI_API_KEY` (or with an unusable model name) the app still works:
 complaints skip AI analysis and land straight in `WARDEN_REVIEW` for manual
-categorisation — by design.
+categorisation — by design. The digest also falls back to the same concise,
+three-line rules-based summary when AI polish is unavailable.
 
 ## Tests
 

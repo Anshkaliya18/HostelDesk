@@ -100,9 +100,14 @@ _DIGEST_CACHE_TTL_SECONDS = 15 * 60
 _DIGEST_TIMEOUT_SECONDS = 8
 
 _DIGEST_PROMPT = """You are the warden's assistant for a hostel maintenance desk.
-Write a 2-4 sentence plain-English daily digest for the warden using ONLY the
-JSON counters below. No people, no names, no invented numbers, no markdown.
-Tone: calm, factual, operational.
+Write a short, clear daily briefing using ONLY the JSON counters below.
+Return exactly three plain-text lines with these labels:
+Activity: new reports and completed today.
+Queue: open complaints, delayed reviews, and overdue tasks.
+Patterns: active repeat alerts and the leading hotspot, if one exists.
+Use the exact numbers provided. Keep the full response under 55 words. No names,
+recommendations, invented causes, markdown, greeting, or extra sentences.
+Tone: calm, factual, direct.
 
 Counters: {payload}
 
@@ -128,6 +133,7 @@ async def ai_polish_digest(digest: dict) -> str | None:
     payload = _json.dumps(
         {
             "date": digest.get("date"),
+            "new_reports": digest.get("submitted_today"),
             "open": digest.get("open_complaints"),
             "overdue": digest.get("overdue_complaints"),
             "completed_today": digest.get("completed_complaints"),
@@ -223,25 +229,23 @@ def _rules_summary(
     hotspots: list[dict],
     oldest_open: dict | None,
     stale_review_count: int,
+    recurring_count: int,
 ) -> tuple[str, list[str]]:
-    """Deterministic 2-4 sentence digest plus short highlight bullets."""
-    parts: list[str] = []
-    if open_count == 0:
-        parts.append("No open complaints right now — everything assigned has been completed.")
-    else:
-        parts.append(f"{open_count} complaints are open.")
-        if overdue_count:
-            parts.append(f"{overdue_count} open task(s) are past their severity-based SLA.")
-    if stale_review_count:
-        parts.append(
-            f"{stale_review_count} complaint(s) have been waiting for warden review for "
-            f"more than {settings.stale_review_hours} hours."
+    """Deterministic three-line digest plus short highlight bullets."""
+    activity = f"Activity: {submitted_today} new reports; {completed_today} completed today."
+    queue = (
+        f"Queue: {open_count} open; {stale_review_count} delayed reviews; "
+        f"{overdue_count} overdue tasks."
+    )
+    if hotspots:
+        top = hotspots[0]
+        pattern = (
+            f"Patterns: {recurring_count} active repeat alerts; busiest is {top['block']} Block, "
+            f"{top['category'].replace('_', ' ').title()} ({top['count']} reports in 30 days)."
         )
-    if submitted_today:
-        parts.append(f"{submitted_today} new complaint(s) were submitted today.")
-    if completed_today:
-        parts.append(f"{completed_today} complaint(s) were completed today.")
-    summary = " ".join(parts[:4])
+    else:
+        pattern = f"Patterns: {recurring_count} active repeat alerts; no 30-day hotspot detected."
+    summary = "\n".join((activity, queue, pattern))
 
     highlights: list[str] = []
     for spot in hotspots:
@@ -327,19 +331,20 @@ def build_daily_digest(db: Session, day: date | None = None) -> dict:
             if _as_utc(complaint.created_at) < review_cutoff:
                 stale_review_count += 1
 
-    today = _utcnow().date()
     summary, highlights = _rules_summary(
         open_count=len(open_complaints),
         overdue_count=len(overdue_complaints),
-        submitted_today=len(created_today) if day == today else 0,
+        submitted_today=len(created_today),
         completed_today=len(completed_today),
         hotspots=top_hotspots,
         oldest_open=oldest_open,
         stale_review_count=stale_review_count,
+        recurring_count=len(recurring),
     )
 
     return {
         "date": day.isoformat(),
+        "submitted_today": len(created_today),
         "open_complaints": len(open_complaints),
         "overdue_complaints": len(overdue_complaints),
         "completed_complaints": len(completed_today),

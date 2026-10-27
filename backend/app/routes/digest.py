@@ -23,6 +23,7 @@ class HotspotOut(BaseModel):
 
 class DigestOut(BaseModel):
     date: str
+    submitted_today: int
     open_complaints: int
     overdue_complaints: int
     completed_complaints: int
