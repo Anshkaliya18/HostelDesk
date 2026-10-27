@@ -255,12 +255,24 @@ DATABASE_URL=postgresql+psycopg2://<role>:<password>@<host>:5432/postgres
 SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<server-side only — never in the browser>
 GEMINI_API_KEY=<google ai studio key>
-STAFF_INVITE_CODE=<your-private-random-code>
+WARDEN_SIGNUP_CODE=<private-warden-invite>
+WORKER_SIGNUP_CODE=<private-worker-invite>
+# Optional shared fallback when a role-specific code is not set:
+STAFF_INVITE_CODE=<private-shared-invite>
 CORS_ORIGINS=http://localhost:5173,https://hosteldesk.aurio.workers.dev
 ```
 
 Model names, rate limits (complaints + signups) and severity SLAs all have sensible defaults and can be overridden — see the commented template.
-The signup limit defaults to 10 attempts per hour per client IP and is held in memory by the API process. During local development, restarting FastAPI clears that process-local counter. It does not reset any separate Supabase Auth limits. Set `STAFF_INVITE_CODE` to the same value you enter on either staff signup form; restart FastAPI after changing it.
+The signup limit defaults to 10 attempts per hour per client IP and is held in memory by the API process. During local development, restarting FastAPI clears that process-local counter. It does not reset any separate Supabase Auth limits. Staff codes are checked by the backend: `WARDEN_SIGNUP_CODE` and `WORKER_SIGNUP_CODE` allow separate invite codes and each overrides the optional shared `STAFF_INVITE_CODE` fallback. If no applicable code is set, signup for that staff role returns 403. Students can still sign up without a code.
+
+**Production staff signup:** the Render backend service must have the appropriate role-specific code set under **Environment** and must be redeployed after changing it. The deployed backend reads these values directly from its environment:
+
+```python
+warden_code = settings.warden_signup_code or settings.staff_invite_code
+worker_code = settings.worker_signup_code or settings.staff_invite_code
+```
+
+The role-specific production variables are honored by the current backend. Keep real invite values in Render's secret environment only; share the relevant code directly with the intended Warden or Worker. Never commit real codes to this documentation or the repository.
 
 **Frontend (`frontend/.env.local`) — all three build-time vars are required:**
 

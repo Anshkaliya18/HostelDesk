@@ -89,6 +89,29 @@ sets trusted `app_metadata` and links the account through `users.auth_user_id`;
 Worker signup also creates a row in the existing `workers` table. The service-role
 key is never embedded in frontend source.
 
+Staff signup is protected by an invite code checked by the backend before an
+account is created. Configure `WARDEN_SIGNUP_CODE` and `WORKER_SIGNUP_CODE` for
+separate role codes. `STAFF_INVITE_CODE` is an optional shared fallback; a
+role-specific value takes precedence. If neither code applies, that role's
+signup returns `403 Staff signup is disabled.` The student signup endpoint is
+not gated by these settings.
+
+The backend check is constant-time and never logs the supplied code:
+
+```python
+role_code = settings.warden_signup_code if role is UserRole.WARDEN else settings.worker_signup_code
+expected = role_code or settings.staff_invite_code
+if not expected:
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff signup is disabled.")
+if not invite_code or not hmac.compare_digest(invite_code.strip().encode(), expected.encode()):
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "A valid staff invite code is required.")
+```
+
+For production, set the invite-code values only in the backend service's secret
+environment (Render → `HostelDesk` → Environment), then deploy the service.
+Share each invite code only with the staff members who need to register; never
+put a real code in source control, screenshots, or public docs.
+
 ## API overview
 
 | Method | Path | Who | Purpose |
@@ -123,7 +146,9 @@ Photos are uploaded once at complaint-creation time, stored privately under
 
 See `.env.example`. Key settings: `DATABASE_URL`, `SUPABASE_URL`,
 `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `GEMINI_API_KEY`,
-`GEMINI_MODEL`, `CORS_ORIGINS`, `TASK_OVERDUE_HOURS`, `MAX_IMAGE_SIZE_MB`.
+`GEMINI_MODEL`, `CORS_ORIGINS`, `STAFF_INVITE_CODE`,
+`WARDEN_SIGNUP_CODE`, `WORKER_SIGNUP_CODE`, `TASK_OVERDUE_HOURS`,
+`MAX_IMAGE_SIZE_MB`.
 
 Without `GEMINI_API_KEY` (or with an unusable model name) the app still works:
 complaints skip AI analysis and land straight in `WARDEN_REVIEW` for manual

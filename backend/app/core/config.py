@@ -58,9 +58,11 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # ---- Staff signup ----
-    # STAFF_INVITE_CODE gates Warden/Worker signup. When empty, staff signup is
-    # disabled entirely (403). Student signup stays open.
+    # Role-specific codes support existing deployments. STAFF_INVITE_CODE is
+    # the shared fallback when a role-specific code is not configured.
     staff_invite_code: str = ""
+    warden_signup_code: str = ""
+    worker_signup_code: str = ""
 
     # ---- Abuse limits (in-memory sliding window; per process) ----
     complaint_rate_limit_10min: int = 5

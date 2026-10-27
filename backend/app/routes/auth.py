@@ -49,13 +49,19 @@ def current_profile(
     return _profile(user, auth_user.get("email", ""))
 
 
-def _check_staff_invite_code(invite_code: str) -> None:
-    """Gate Warden/Worker signup behind the server-side invite code.
+def _check_staff_invite_code(invite_code: str, role: UserRole) -> None:
+    """Gate Warden/Worker signup behind a role-specific server-side code.
 
-    The code lives only in the backend environment (STAFF_INVITE_CODE). When it
-    is unset, staff signup is disabled entirely. Comparison is constant-time.
+    WARDEN_SIGNUP_CODE and WORKER_SIGNUP_CODE take precedence for their role;
+    STAFF_INVITE_CODE is the shared fallback. If no applicable code is set,
+    that role's signup stays disabled. Comparison is constant-time.
     """
-    expected = settings.staff_invite_code
+    role_code = (
+        settings.warden_signup_code
+        if role is UserRole.WARDEN
+        else settings.worker_signup_code
+    )
+    expected = role_code or settings.staff_invite_code
     if not expected:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Staff signup is disabled.")
     supplied = (invite_code or "").strip()
@@ -149,7 +155,7 @@ def student_signup(payload: StudentSignup, request: Request, db: Session = Depen
 @role_router.post("/warden/signup", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
 def warden_signup(payload: WardenSignup, request: Request, db: Session = Depends(get_db)) -> ProfileOut:
     _check_signup_rate_limit(request)
-    _check_staff_invite_code(payload.invite_code)
+    _check_staff_invite_code(payload.invite_code, UserRole.WARDEN)
     return _create_account(
         db,
         email=payload.email.strip().casefold(),
@@ -162,7 +168,7 @@ def warden_signup(payload: WardenSignup, request: Request, db: Session = Depends
 @role_router.post("/worker/signup", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
 def worker_signup(payload: WorkerSignup, request: Request, db: Session = Depends(get_db)) -> ProfileOut:
     _check_signup_rate_limit(request)
-    _check_staff_invite_code(payload.invite_code)
+    _check_staff_invite_code(payload.invite_code, UserRole.WORKER)
     return _create_account(
         db,
         email=payload.email.strip().casefold(),
