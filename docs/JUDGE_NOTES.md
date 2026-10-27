@@ -97,6 +97,9 @@ For local judge signup testing, use **`HOSTELDESK-JUDGE-LOCAL-ONLY`**. Set
 sample is local-only and will not match the private production role codes.
 Never use it in a hosted environment or replace the production secrets with it.
 
+you can use `HD-qwIo_jPJatCALt3IVBAZCczv` WARDEN_SIGNUP_CODE AND WORKER_SIGNUP_CODE 
+for testing signup purposes in live prototype 
+
 ## Student confirmation: why the loop
 
 The status chain ends at COMPLETED, but "completed" is a claim by staff. The
