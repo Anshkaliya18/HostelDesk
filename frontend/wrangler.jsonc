@@ -1,0 +1,10 @@
+// Static-assets deploy of the Vite build. SPA fallback keeps client-side
+// routes (e.g. /warden) working on refresh.
+{
+  "name": "hosteldesk",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
