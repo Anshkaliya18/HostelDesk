@@ -65,7 +65,7 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 ---
 
 ## Architecture
-
+.
 ```text
               https://hosteldesk.aurio.workers.dev
               Student  ·  Warden  ·  Worker (React SPA)
@@ -120,7 +120,7 @@ Suggested demo walkthrough (one complaint, all three roles):
 5. Warden                  → check repeat-problem alerts + daily digest
 ```
 
-> Tip: open the three roles in separate browser tabs/incognito windows for the smoothest demo.
+> Tip: open the three roles in separate browser tabs/incognito windows for the smoothest demo..
 
 **Demo accounts on the live site** (also usable by judges):
 
@@ -167,7 +167,7 @@ Suggested demo walkthrough (one complaint, all three roles):
 ---
 
 ## Project Structure
-
+.
 ```text
 HostelDesk/
 │
@@ -211,7 +211,7 @@ Swagger UI: <http://127.0.0.1:8000/docs>
 
 > Without `GEMINI_API_KEY` or Supabase keys the app still runs: AI is skipped (complaints go straight to warden review) and photos fall back to the local `uploads/` folder.
 
-### 2. Frontend (Vite)
+### 2. Frontend (Vite) :
 
 ```bash
 cd frontend
