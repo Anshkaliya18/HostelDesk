@@ -95,10 +95,7 @@ For local judge signup testing, use **`HOSTELDESK-JUDGE-LOCAL-ONLY`**. Set
 `STAFF_INVITE_CODE=HOSTELDESK-JUDGE-LOCAL-ONLY` in `backend/.env`, leave
 `WARDEN_SIGNUP_CODE` and `WORKER_SIGNUP_CODE` blank, and restart FastAPI. This
 sample is local-only and will not match the private production role codes.
-Never use it in a hosted environment or replace the production secrets with it.
-
-you can use `HD-qwIo_jPJatCALt3IVBAZCczv` WARDEN_SIGNUP_CODE AND WORKER_SIGNUP_CODE 
-for testing signup purposes in live prototype 
+Never use it in a hosted environment or replace the production secrets with it. 
 
 ## Student confirmation: why the loop
 
