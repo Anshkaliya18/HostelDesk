@@ -7,6 +7,7 @@ depends on Gemini.
 import logging
 from datetime import date, timedelta, datetime, timezone
 
+from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -193,6 +194,45 @@ def list_active_alerts(db: Session) -> list[Alert]:
         .order_by(Alert.created_at.desc())
     )
     return list(db.execute(stmt).scalars())
+
+
+def list_alerts(db: Session, alert_status: str = "active") -> list[Alert]:
+    """Repeat-problem alerts filtered by lifecycle state.
+
+    alert_status: "active" (default, unresolved), "resolved", or "all".
+    """
+    stmt = select(Alert).order_by(Alert.created_at.desc())
+    if alert_status == "active":
+        stmt = stmt.where(Alert.resolved_at.is_(None))
+    elif alert_status == "resolved":
+        stmt = stmt.where(Alert.resolved_at.is_not(None))
+    return list(db.execute(stmt).scalars())
+
+
+def resolve_alert(db: Session, alert_id: int) -> Alert:
+    """Warden explicitly marks a repeat-problem alert as resolved.
+
+    The timestamp is set server-side and never accepted from the client.
+    Resolution is never implicit: opening or reviewing a complaint does not
+    resolve anything. Because active-alert lookups ignore resolved rows, a
+    genuine recurrence detected after resolution creates a fresh alert
+    instead of being silently folded into the resolved one.
+    """
+    alert = db.get(Alert, alert_id)
+    if alert is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Alert not found.",
+        )
+    if alert.resolved_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Alert is already resolved.",
+        )
+    alert.resolved_at = _utcnow()
+    db.commit()
+    logger.info("Repeat-problem alert %s marked resolved", alert_id)
+    return alert
 
 
 def _is_overdue(task: Task) -> bool:

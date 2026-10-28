@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useState } from 'react'
 import {
   aiSweep, getAlerts, getComplaint, getComplaints, getDashboard,
-  getDigest, getPhoto, getReports, getWorkers, reanalyzeComplaint, reviewComplaint,
+  getDigest, getPhoto, getReports, getWorkers, reanalyzeComplaint, resolveAlert, reviewComplaint,
 } from '../../services/warden.js'
 import { LogoIcon } from '../../components/Icons.jsx'
 import { RoleGate } from '../RoleApp.jsx'
@@ -402,15 +402,24 @@ function Reports({ onOpenAlert, onOpenComplaint }) {
   const [reportsState, setReportsState] = useState({ loading: true, error: '', data: null })
   const [alertsState, setAlertsState] = useState({ loading: true, error: '', data: [] })
   const [digestState, setDigestState] = useState({ loading: true, error: '', data: null })
+  // Alert list view: active (default) or resolved. Resolution is an explicit
+  // warden action with confirmation; the server sets the resolved timestamp.
+  const [alertsView, setAlertsView] = useState('active')
+  const [alertAction, setAlertAction] = useState({ id: null, error: '' })
 
   useEffect(() => {
     let active = true
     getReports().then(data => { if (active) setReportsState({ loading: false, error: '', data }) })
       .catch(error => { if (active) setReportsState(state => ({ ...state, loading: false, error: error.message })) })
-    getAlerts().then(data => { if (active) setAlertsState({ loading: false, error: '', data }) })
-      .catch(error => { if (active) setAlertsState(state => ({ ...state, loading: false, error: error.message })) })
     return () => { active = false }
   }, [refreshKey])
+
+  useEffect(() => {
+    let active = true
+    getAlerts(alertsView).then(data => { if (active) setAlertsState({ loading: false, error: '', data }) })
+      .catch(error => { if (active) setAlertsState(state => ({ ...state, loading: false, error: error.message })) })
+    return () => { active = false }
+  }, [refreshKey, alertsView])
 
   useEffect(() => {
     let active = true
@@ -431,6 +440,25 @@ function Reports({ onOpenAlert, onOpenComplaint }) {
   function changeDigestDate(value) {
     setDigestState({ loading: true, error: '', data: null })
     setDigestDate(value)
+  }
+
+  function changeAlertsView(value) {
+    if (value === alertsView) return
+    setAlertsState(state => ({ ...state, loading: true, error: '' }))
+    setAlertsView(value)
+  }
+
+  async function handleResolveAlert(alert) {
+    if (!window.confirm(`Mark "${alert.block} Block · ${human(alert.category)}" as resolved? It moves to the Resolved list.`)) return
+    setAlertAction({ id: alert.id, error: '' })
+    try {
+      await resolveAlert(alert.id)
+      setAlertAction({ id: null, error: '' })
+      setAlertsState(state => ({ ...state, loading: true }))
+      setRefreshKey(value => value + 1)
+    } catch (error) {
+      setAlertAction({ id: null, error: error.message || 'Could not resolve the alert.' })
+    }
   }
 
   return <>
@@ -460,14 +488,31 @@ function Reports({ onOpenAlert, onOpenComplaint }) {
         <div className="report-list">{Object.entries(data.by_category || {}).map(([key, value]) => <div key={key}><span>{human(key)}</span><strong>{value}</strong></div>)}</div>
       </section>
       <section className="warden-card report-alert-card">
-        <div className="digest-section-heading"><div><p className="digest-eyebrow">Repeat patterns</p><h3>Active alerts</h3></div><span className="report-count">{alerts.length}</span></div>
+        <div className="digest-section-heading"><div><p className="digest-eyebrow">Repeat patterns</p><h3>Repeat alerts</h3></div><span className="report-count">{alerts.length}</span></div>
+        <div className="alert-view-toggle" role="group" aria-label="Filter alerts by state">
+          <button type="button" className={alertsView === 'active' ? 'active' : ''} onClick={() => changeAlertsView('active')}>Active</button>
+          <button type="button" className={alertsView === 'resolved' ? 'active' : ''} onClick={() => changeAlertsView('resolved')}>Resolved</button>
+        </div>
         {alertsState.error && <p className="reports-inline-error" role="alert">Alerts could not load: {alertsState.error}</p>}
-        {alertsState.loading && !alerts.length ? <p className="warden-state" role="status">Loading alerts…</p> : alerts.length ? <ul className="alert-list">{alerts.map(alert => <li key={alert.id}>
-          <button type="button" className="alert-list__link" onClick={() => alert.block && onOpenAlert?.({ block: alert.block, category: alert.category || '' })}>
-            <span className="alert-list__topline"><strong>{alert.block} Block · {human(alert.category)}</strong><span>{alert.complaint_count} reports</span></span>
-            <span>{alert.message}</span><small>{date(alert.created_at)} · Open matching reports →</small>
-          </button>
-        </li>)}</ul> : <p className="warden-state">No active repeat-problem alerts.</p>}
+        {alertAction.error && <p className="reports-inline-error" role="alert">{alertAction.error}</p>}
+        {alertsState.loading && !alerts.length ? <p className="warden-state" role="status">Loading alerts…</p> : alerts.length ? <ul className="alert-list">{alerts.map(alert => <li key={alert.id} className={alert.resolved_at ? 'alert-list__item--resolved' : ''}>
+          {alert.resolved_at ? (
+            <div className="alert-list__link alert-list__link--static">
+              <span className="alert-list__topline"><strong>{alert.block} Block · {human(alert.category)}</strong><span className="alert-list__state">Resolved</span></span>
+              <span>{alert.message}</span><small>Resolved {date(alert.resolved_at)}</small>
+            </div>
+          ) : (
+            <>
+              <button type="button" className="alert-list__link" onClick={() => alert.block && onOpenAlert?.({ block: alert.block, category: alert.category || '' })}>
+                <span className="alert-list__topline"><strong>{alert.block} Block · {human(alert.category)}</strong><span>{alert.complaint_count} reports</span></span>
+                <span>{alert.message}</span><small>{date(alert.created_at)} · Open matching reports →</small>
+              </button>
+              <button type="button" className="alert-list__resolve" disabled={alertAction.id === alert.id} onClick={() => handleResolveAlert(alert)}>
+                {alertAction.id === alert.id ? 'Resolving…' : 'Mark resolved'}
+              </button>
+            </>
+          )}
+        </li>)}</ul> : <p className="warden-state">{alertsView === 'resolved' ? 'No resolved repeat-problem alerts yet.' : 'No active repeat-problem alerts.'}</p>}
       </section>
     </div>}
   </>

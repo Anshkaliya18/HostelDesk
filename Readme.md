@@ -47,7 +47,7 @@ The warden also gets **repeat-problem alerts** and a **daily digest** — no AI 
 - **Approve AI suggestion** (one click — the warden still presses the button) or edit any field
 - Matching-trade workers listed first, sorted by fewest active tasks; **Re-run AI** when a first pass failed
 - Red **Safety risk** badge whenever the AI flags a hazard (auto-escalates severity to HIGH)
-- Repeat-problem alerts (deterministic rule: same block + category recurring complaints) — clickable through to the filtered queue
+- Repeat-problem alerts (deterministic rule: same block + category recurring complaints) — clickable through to the filtered queue, with an explicit warden-only "Mark resolved" action (server-set timestamp; resolving lets a genuine recurrence raise a fresh alert)
 - Daily digest report with a UTC date selector, deterministic counters, category mix, hotspots, oldest open complaint, and active alerts
 - Copy or download a plain-text digest to share with the hostel team
 
@@ -308,7 +308,7 @@ cd backend
 python -m pytest -q
 ```
 
-113 tests cover AI readiness (including malformed output, duplicate-check prompts, the Gemini 2.5 request shape), complaint validation & ownership, role-based auth, staff invite codes, rate limits, the student confirm/reopen loop, warden dashboard/filters (including block + needs-review), worker task ownership, the warden review gate, repeat-problem alerts (incl. submission-time detection), digest + severity-based SLA, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
+118 tests cover AI readiness (including malformed output, duplicate-check prompts, the Gemini 2.5 request shape), complaint validation & ownership, role-based auth, staff invite codes, rate limits, the student confirm/reopen loop, warden dashboard/filters (including block + needs-review), worker task ownership, the warden review gate, repeat-problem alerts (incl. submission-time detection and the explicit warden resolve lifecycle), digest + severity-based SLA, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
 
 ---
 

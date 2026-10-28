@@ -50,7 +50,9 @@ export const reviewComplaint = (id, payload) => request(`/complaints/${id}/revie
 })
 export const reanalyzeComplaint = id => request(`/complaints/${id}/reanalyze`, { method: 'POST' })
 export const aiSweep = () => request('/warden/ai-sweep', { method: 'POST' }).catch(() => null)
-export const getAlerts = () => request('/alerts')
+export const getAlerts = (alertStatus = 'active') =>
+  request(`/alerts${alertStatus === 'active' ? '' : `?status=${encodeURIComponent(alertStatus)}`}`)
+export const resolveAlert = id => request(`/alerts/${id}/resolve`, { method: 'POST' })
 export const getDigest = day => {
   const query = day ? `?date=${encodeURIComponent(day)}` : ''
   return request(`/digest${query}`)
