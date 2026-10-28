@@ -536,5 +536,3 @@ def test_valid_duplicate_id_against_recent_complaints_is_kept(client, seed_users
     assert second.status_code == 201, second.text
     detail = _detail(client, users, second.json()["id"])
     assert detail["ai_recommendation"]["duplicate_of_complaint_id"] == first["id"]
-
-\n

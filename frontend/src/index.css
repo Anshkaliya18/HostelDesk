@@ -1612,3 +1612,29 @@ button:disabled {
 .cold-start-banner { position:fixed; right:16px; bottom:16px; z-index:60; background:#1f2933; color:#fff; font-size:13px; font-weight:600; padding:10px 16px; border-radius:999px; box-shadow:0 6px 20px rgba(15,23,32,.25); animation:coldstart-pulse 1.6s ease-in-out infinite }
 @keyframes coldstart-pulse { 0%,100% { opacity:.85 } 50% { opacity:1 } }
 @media (prefers-reduced-motion: reduce) { .cold-start-banner { animation:none } }
+
+/* ---- Demo role switcher (Phase 1c) ---- */
+.demo-switcher { position: fixed; bottom: 92px; right: 16px; z-index: 50; font-family: var(--font-sans); }
+.demo-switcher__toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 14px; border: 1px solid var(--color-border-strong); border-radius: 999px; background: var(--color-surface); color: var(--color-text); font-size: 12.5px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(15,23,32,0.12); }
+.demo-switcher__toggle:hover { border-color: var(--color-primary); }
+.demo-switcher__panel { position: absolute; bottom: 46px; right: 0; width: min(260px, 92vw); padding: 12px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: 0 8px 24px rgba(15,23,32,0.14); animation: demo-panel-in 180ms ease-out; transform-origin: bottom right; }
+@keyframes demo-panel-in { from { opacity: 0; transform: scale(0.95) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.demo-switcher__note { margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); color: var(--color-muted); font-size: 11.5px; font-weight: 600; }
+.demo-switcher__role { display: block; width: 100%; text-align: left; min-height: 36px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: #fff; color: var(--color-text); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }
+.demo-switcher__role:hover:not(:disabled) { background: var(--color-primary-soft); border-color: var(--color-primary-border); color: var(--color-primary); }
+.demo-switcher__role:disabled { opacity: .65; cursor: wait; }
+.demo-switcher__error { margin: 8px 0 0; color: var(--color-danger); font-size: 11.5px; line-height: 1.45; }
+
+@media (max-width: 640px) {
+  .demo-switcher { bottom: 82px; right: 12px; }
+  .demo-switcher__panel { bottom: 42px; width: min(240px, 94vw); left: 12px; right: auto; }
+}
+
+/* ---- Demo walkthrough card (Phase 1d) ---- */
+.demo-walkthrough { margin: 0 0 20px; padding: 18px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: #fffbf4; position: relative; }
+.demo-walkthrough__dismiss { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border: 0; border-radius: 6px; background: var(--color-surface-subtle); color: var(--color-muted); font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.demo-walkthrough__dismiss:hover { background: var(--color-surface-hover); color: var(--color-text); }
+.demo-walkthrough h2 { margin: 0 0 10px; font-size: 16px; font-weight: 700; color: var(--color-text); letter-spacing: -0.02em; }
+.demo-walkthrough ol { margin: 0; padding-left: 20px; color: var(--color-text-secondary); font-size: 13px; line-height: 1.7; }
+.demo-walkthrough ol li { margin-bottom: 6px; }
+.demo-walkthrough ol li::marker { color: var(--color-primary); font-weight: 700; }

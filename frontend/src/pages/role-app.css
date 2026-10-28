@@ -137,6 +137,18 @@
 .role-auth-error { border: 1px solid #f0d2cd; background: #fff7f5; color: #a13e32; }
 .role-auth-message { border: 1px solid #d5e9dc; background: #f2faf4; color: #25674e; }
 .role-auth-security { margin-top: 16px; color: #8b9893; font-size: 9px; line-height: 1.6; text-align: center; }
+.role-auth-try-demo { width: 100%; min-height: 44px; margin: 12px 0 4px; padding: 0 16px; border: 1px solid #116550; border-radius: 8px; background: linear-gradient(135deg, #176e5a, #105a4b); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 5px 12px #11655024; transition: transform .15s, box-shadow .15s, background .15s; }
+.role-auth-try-demo:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 16px #11655030; }
+.role-auth-try-demo:disabled { cursor: wait; opacity: .72; }
+.role-auth-value-prop { margin: 24px 0 16px; padding: 14px; border: 1px solid #dce5df; border-radius: 10px; background: #f7f9f7; text-align: center; }
+.role-auth-value-line { color: #40524e; font-size: 12px; font-weight: 650; line-height: 1.6; margin: 0; }
+.role-auth-value-line + .role-auth-value-line { margin-top: 6px; }
+.role-auth-demo { margin: 20px 0 12px; }
+.role-auth-demo-title { color: #72817e; font-size: 10px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; margin: 0 0 10px; text-align: center; }
+.role-auth-demo-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.role-auth-demo-btn { flex: 1 1 140px; min-height: 40px; padding: 0 14px; border: 1px solid #dce5df; border-radius: 8px; background: #fff; color: #176b59; font-size: 11px; font-weight: 700; cursor: pointer; transition: background .15s, border-color .15s; }
+.role-auth-demo-btn:hover:not(:disabled) { background: #f2faf4; border-color: #338c75; }
+.role-auth-demo-btn:disabled { opacity: .7; cursor: wait; }
 .role-auth-signout { align-self: center; margin-top: 11px; padding: 6px 10px; border: 0; background: transparent; color: #71817b; font-size: 10px; font-weight: 650; }
 .role-auth-signout:hover { color: #a33f35; }
 .role-auth-loading { display: flex; min-height: 100vh; align-items: center; justify-content: center; gap: 10px; background: #f4f6f2; color: #52635e; font: 12px Inter, ui-sans-serif, system-ui, sans-serif; }
@@ -145,7 +157,11 @@
 @media (max-width: 760px) {
   .role-auth-shell { padding: 18px; }
   .role-auth-card { width: min(100%, 520px); min-height: 0; grid-template-columns: 1fr; border-radius: 18px; }
-  .role-auth-visual { display: none; }
+  .role-auth-visual { padding: 20px 24px 16px; }
+  .role-auth-pitch { margin-top: 12px; padding: 20px 0 12px; }
+  .role-auth-pitch h2 { font-size: clamp(24px, 8vw, 30px); }
+  .role-auth-pitch>p { max-width: 100%; font-size: 12px; }
+  .role-workflow { margin-top: 8px; gap: 7px; }
   .role-auth-content { padding: 22px clamp(22px, 7vw, 38px) 28px; }
   .role-auth-mobile-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 22px; color: #173e36; font-size: 14px; font-weight: 760; }
   .role-auth-mobile-brand .role-brand-mark { width: 31px; height: 31px; border-color: #d8e8df; background: #eaf4ee; color: #176b59; }

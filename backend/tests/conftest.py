@@ -23,6 +23,11 @@ os.environ["GEMINI_API_KEY"] = ""
 # may carry a different working model.
 os.environ["GEMINI_MODEL"] = "gemini-2.5-flash"
 os.environ["GEMINI_FALLBACK_MODEL"] = "gemini-2.5-flash-lite"
+# Keep staff signup gating hermetic: the real .env may carry invite codes that
+# would leak into tests and break invite-code assertions.
+os.environ["WARDEN_SIGNUP_CODE"] = ""
+os.environ["WORKER_SIGNUP_CODE"] = ""
+os.environ["MIGRATION_DATABASE_URL"] = ""
 _TEST_UPLOAD_DIR = Path(tempfile.mkdtemp(prefix="hosteldesk-test-uploads-"))
 os.environ["UPLOAD_DIR"] = str(_TEST_UPLOAD_DIR)
 

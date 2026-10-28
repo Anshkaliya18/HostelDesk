@@ -10,6 +10,12 @@ const roles = {
 }
 const dashboardPath = role => `/${role}/dashboard`
 
+const DEMO_ROLES = [
+  { key: 'student', label: 'Try as Student', email: import.meta.env.VITE_DEMO_STUDENT_EMAIL || '', password: import.meta.env.VITE_DEMO_STUDENT_PASSWORD || '' },
+  { key: 'warden', label: 'Try as Warden', email: import.meta.env.VITE_DEMO_WARDEN_EMAIL || '', password: import.meta.env.VITE_DEMO_WARDEN_PASSWORD || '' },
+  { key: 'worker', label: 'Try as Worker', email: import.meta.env.VITE_DEMO_WORKER_EMAIL || '', password: import.meta.env.VITE_DEMO_WORKER_PASSWORD || '' },
+]
+
 function AuthScreen({ role, mode, setMode, session, onSignOut, formError, setFormError }) {
   const config = roles[role]
   const [name, setName] = useState('')
@@ -43,6 +49,22 @@ function AuthScreen({ role, mode, setMode, session, onSignOut, formError, setFor
         if (error) throw new Error('Email or password is incorrect.')
         setMessage('Signed in. Opening your dashboard…')
       }
+    } catch (error) {
+      setFormError(error.message || 'The request could not be completed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDemoSignIn(roleKey) {
+    const demo = DEMO_ROLES.find(r => r.key === roleKey)
+    if (!demo || !demo.email || !demo.password) return
+    setBusy(true); setFormError(''); setMessage('')
+    try {
+      if (!supabase) throw new Error('Supabase Auth is not configured for this app.')
+      const { error } = await supabase.auth.signInWithPassword({ email: demo.email, password: demo.password })
+      if (error) throw error
+      setMessage(`Signed in as ${demo.email}. Opening your dashboard…`)
     } catch (error) {
       setFormError(error.message || 'The request could not be completed.')
     } finally {
@@ -85,6 +107,19 @@ function AuthScreen({ role, mode, setMode, session, onSignOut, formError, setFor
           <h1>{isSignup ? `Create your ${config.label.toLowerCase()} account` : `Welcome back`}</h1>
           <p>{isSignup ? 'A few details and you’re ready to go.' : `Sign in to continue to your ${config.label.toLowerCase()} workspace.`}</p>
         </div>
+
+        {(import.meta.env.VITE_DEMO_STUDENT_EMAIL && import.meta.env.VITE_DEMO_STUDENT_PASSWORD && role === 'student') ||
+        (import.meta.env.VITE_DEMO_WARDEN_EMAIL && import.meta.env.VITE_DEMO_WARDEN_PASSWORD && role === 'warden') ||
+        (import.meta.env.VITE_DEMO_WORKER_EMAIL && import.meta.env.VITE_DEMO_WORKER_PASSWORD && role === 'worker') ? (
+          <button
+            type="button"
+            className={`role-auth-try-demo${busy ? ' disabled' : ''}`}
+            disabled={busy}
+            onClick={() => handleDemoSignIn(role)}
+          >
+            {busy ? <><span className="role-spinner" />Signing in…</> : `Try as ${config.label}`}
+          </button>
+        ) : null}
 
         <div className="role-auth-mode" role="tablist" aria-label="Account access">
           <button type="button" role="tab" aria-selected={!isSignup} className={!isSignup ? 'active' : ''} onClick={() => changeMode('login')}>Sign in</button>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { LogoIcon } from '../../components/Icons.jsx'
 import { RoleGate } from '../RoleApp.jsx'
+import DemoSwitcher from '../../components/DemoSwitcher.jsx'
 import { getWorkerComplaint, getWorkerTasks, updateWorkerTask } from '../../services/roleApi.js'
 import '../portal.css'
 
@@ -134,7 +135,7 @@ function WorkerWorkspace({ profile, onSignOut }) {
       <a className="warden-brand" href="/worker/dashboard" onClick={event => { event.preventDefault(); closeComplaint() }}>
         <span className="warden-brand-mark"><LogoIcon /></span><span>HostelDesk<small>WORKER PORTAL</small></span>
       </a>
-      <div className="warden-user"><span className="warden-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><span>{profile.name}<small>{profile.email}</small></span><button type="button" className="student-link" onClick={onSignOut}>Sign out</button></div>
+      <div className="warden-user"><span className="warden-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><span>{profile.name}<small>{profile.email}</small></span><button type="button" className="student-link" onClick={onSignOut}>Sign out</button></div>{profile && <DemoSwitcher currentEmail={profile.email} />}
     </header>
 
     <main className="worker-main">

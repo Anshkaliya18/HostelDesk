@@ -5,6 +5,7 @@ import {
 } from '../../services/warden.js'
 import { LogoIcon } from '../../components/Icons.jsx'
 import { RoleGate } from '../RoleApp.jsx'
+import DemoSwitcher from '../../components/DemoSwitcher.jsx'
 import '../portal.css'
 
 // Bounded background sweep: fire-and-forget at most once per page load.
@@ -481,7 +482,7 @@ function WardenWorkspace({ profile, onSignOut }) {
     setPath(next); setDetailId(id ? String(id) : null); window.scrollTo(0, 0)
   }
   const route = detailId ? 'detail' : path.split('/')[2] || 'dashboard'
-  return <div className="warden-app"><header className="warden-topbar"><a href="/warden/dashboard" onClick={e => { e.preventDefault(); navigate('/warden/dashboard') }} className="warden-brand"><span className="warden-brand-mark"><LogoIcon /></span><span>HostelDesk<small>WARDEN PORTAL</small></span></a><div className="warden-user"><span className="warden-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><span>{profile.name}<small>{profile.email}</small></span><button className="student-link" onClick={onSignOut}>Sign out</button></div></header>
+  return <div className="warden-app"><header className="warden-topbar"><a href="/warden/dashboard" onClick={e => { e.preventDefault(); navigate('/warden/dashboard') }} className="warden-brand"><span className="warden-brand-mark"><LogoIcon /></span><span>HostelDesk<small>WARDEN PORTAL</small></span></a><div className="warden-user"><span className="warden-avatar">{profile.name.slice(0, 1).toUpperCase()}</span><span>{profile.name}<small>{profile.email}</small></span><button className="student-link" onClick={onSignOut}>Sign out</button></div>{profile && <DemoSwitcher currentEmail={profile.email} />}</header>
     <div className="warden-layout"><aside className="warden-sidebar"><p className="warden-nav-label">WORKSPACE</p>{links.map(([href, label]) => <a key={href} className={route === href.split('/')[2] || (route === 'detail' && label === 'Complaints') ? 'active' : ''} href={href} onClick={e => { e.preventDefault(); navigate(href) }}><span className="nav-dot" />{label}</a>)}<div className="sidebar-hint"><strong>Review gate</strong><span>AI suggests. You decide.</span></div></aside>
       <main className="warden-main"><div className="warden-mobile-nav">{links.map(([href, label]) => <a key={href} href={href} onClick={e => { e.preventDefault(); navigate(href) }} className={route === href.split('/')[2] ? 'active' : ''}>{label}</a>)}</div>
         {route === 'dashboard' && <Dashboard onSelect={id => navigate(`/warden/complaints/${id}`, id)} />}{route === 'complaints' && !detailId && <Complaints onSelect={id => navigate(`/warden/complaints/${id}`, id)} />}

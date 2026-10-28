@@ -4,7 +4,7 @@ const configuredApiOrigin = (import.meta.env.VITE_API_BASE_URL || '').trim()
 // Local development uses Vite's /auth, /complaints, etc. proxy. Production
 // must call the FastAPI service directly instead of the static SPA Worker.
 export const API_BASE_URL = (
-  configuredApiOrigin || (import.meta.env.PROD ? productionApiOrigin : '')
+  configuredApiOrigin || (import.meta.env.PROD ? productionApiOrigin : 'http://127.0.0.1:8000')
 ).replace(/\/+$/, '')
 
 export async function readApiJson(response) {
