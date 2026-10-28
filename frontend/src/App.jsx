@@ -4,7 +4,6 @@ import ComplaintForm from './components/ComplaintForm.jsx'
 import SuccessState from './components/SuccessState.jsx'
 import MyComplaints from './components/MyComplaints.jsx'
 import ColdStartBanner from './components/ColdStartBanner.jsx'
-import DemoSwitcher from './components/DemoSwitcher.jsx'
 import { warmUp } from './utils/coldStart.js'
 import { API_BASE_URL } from './services/apiBase.js'
 import { RoleGate } from './pages/RoleApp.jsx'
@@ -16,13 +15,6 @@ function StudentDashboard({ session, profile, onSignOut }) {
   const [submission, setSubmission] = useState(null)
   const [hasPreviousSubmission, setHasPreviousSubmission] = useState(false)
   const [tab, setTab] = useState('report')
-  const [walkthroughDismissed, setWalkthroughDismissed] = useState(
-    sessionStorage.getItem('hosteldesk_walkthrough_dismissed') === 'true'
-  )
-  const demoStudentEmail = (import.meta.env.VITE_DEMO_STUDENT_EMAIL || '').trim().toLowerCase()
-  const isDemoStudent = Boolean(
-    session && profile && profile.email && demoStudentEmail && profile.email.trim().toLowerCase() === demoStudentEmail
-  )
 
   function handleSubmission(result) {
     setSubmission(result)
@@ -40,71 +32,43 @@ function StudentDashboard({ session, profile, onSignOut }) {
       </a>
 
       <Header profile={profile} onSignOut={onSignOut} />
-      {isDemoStudent && <DemoSwitcher currentEmail={profile.email} />}
 
       <main className="main" id="main-content" tabIndex={-1}>
         <div className="container page-shell">
-          <div className="page-grid">
-            {isDemoStudent && !walkthroughDismissed && (
-              <section className="demo-walkthrough" aria-label="Demo walkthrough">
-                <button type="button" className="demo-walkthrough__dismiss" onClick={() => { setWalkthroughDismissed(true); sessionStorage.setItem('hosteldesk_walkthrough_dismissed', 'true') }} aria-label="Dismiss walkthrough">×</button>
-                <h2>Demo walkthrough</h2>
-                <ol>
-                  <li>Report a problem with a photo — use "Report a problem" and submit.</li>
-                  <li>Switch to Warden using "Switch role" and approve the AI suggestion.</li>
-                  <li>Switch to Worker and complete the task with a note (5+ characters).</li>
-                  <li>Switch back to Student and open "My complaints" to see Completed.</li>
-                </ol>
-              </section>
-            )}
-            <section className="intro" aria-labelledby="page-title">
-              <p className="eyebrow">Hostel maintenance</p>
-              <h1 className="intro__title" id="page-title">
-                Report a hostel problem
-              </h1>
-              <p className="intro__copy">
-                Tell us what needs attention. Add a photo if it helps us understand the
-                issue.
-              </p>
+          <header className="page-heading">
+            <p className="eyebrow">Hostel maintenance</p>
+            <h1 className="page-heading__title" id="page-title">
+              Report a hostel problem
+            </h1>
+            <p className="page-heading__copy">
+              Tell us what needs attention in your block, attach a photo if it helps,
+              and follow every update under &ldquo;My complaints&rdquo;.
+            </p>
+          </header>
 
-              <div className="student-tabs" role="tablist" aria-label="Student dashboard sections">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === 'report'}
-                  className={`student-tab${tab === 'report' ? ' student-tab--active' : ''}`}
-                  onClick={() => setTab('report')}
-                >
-                  Report a problem
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === 'track'}
-                  className={`student-tab${tab === 'track' ? ' student-tab--active' : ''}`}
-                  onClick={() => setTab('track')}
-                >
-                  My complaints
-                </button>
-              </div>
+          <div className="student-tabs" role="tablist" aria-label="Student dashboard sections">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'report'}
+              className={`student-tab${tab === 'report' ? ' student-tab--active' : ''}`}
+              onClick={() => setTab('report')}
+            >
+              Report a problem
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'track'}
+              className={`student-tab${tab === 'track' ? ' student-tab--active' : ''}`}
+              onClick={() => setTab('track')}
+            >
+              My complaints
+            </button>
+          </div>
 
-              {!submission && tab === 'report' ? (
-                <div className="intro__notes">
-                  <h2 className="intro__notes-title">Before you submit</h2>
-                  <ul className="intro__list">
-                    <li>Include the block letter and room number.</li>
-                    <li>Describe what is broken and how long it has been an issue.</li>
-                    <li>Add a photo if it helps show the problem.</li>
-                  </ul>
-                  <p className="intro__process">
-                    Reports are reviewed by the hostel office before maintenance work
-                    is assigned. You can follow every step under "My complaints".
-                  </p>
-                </div>
-              ) : null}
-            </section>
-
-            <div className="form-column">
+          <div className={`dashboard-grid${submission ? ' dashboard-grid--single' : ''}`}>
+            <div className="dashboard-main">
               {tab === 'track' && !submission ? (
                 <MyComplaints accessToken={session?.access_token} />
               ) : submission ? (
@@ -123,13 +87,68 @@ function StudentDashboard({ session, profile, onSignOut }) {
                 />
               )}
             </div>
+
+            {!submission ? (
+              <aside className="dashboard-aside">
+                {tab === 'report' ? (
+                  <section className="aside-card" aria-labelledby="before-submit-title">
+                    <h2 className="aside-card__title" id="before-submit-title">
+                      Before you submit
+                    </h2>
+                    <ol className="checklist">
+                      <li>
+                        <span className="checklist__step" aria-hidden="true">1</span>
+                        <span>Include the block letter and room number.</span>
+                      </li>
+                      <li>
+                        <span className="checklist__step" aria-hidden="true">2</span>
+                        <span>Describe what is broken and how long it has been an issue.</span>
+                      </li>
+                      <li>
+                        <span className="checklist__step" aria-hidden="true">3</span>
+                        <span>Add a photo if it helps show the problem.</span>
+                      </li>
+                    </ol>
+                    <p className="aside-card__note">
+                      Reports are reviewed by the hostel office before maintenance work
+                      is assigned. You can follow every step under
+                      &ldquo;My complaints&rdquo;.
+                    </p>
+                  </section>
+                ) : (
+                  <section className="aside-card" aria-labelledby="tracking-legend-title">
+                    <h2 className="aside-card__title" id="tracking-legend-title">
+                      Status guide
+                    </h2>
+                    <ul className="status-legend">
+                      <li>
+                        <span className="track-badge track-badge--wait">Submitted</span>
+                        <span>Received by the hostel office and awaiting review.</span>
+                      </li>
+                      <li>
+                        <span className="track-badge track-badge--active">In progress</span>
+                        <span>Maintenance work is being arranged.</span>
+                      </li>
+                      <li>
+                        <span className="track-badge track-badge--done">Completed</span>
+                        <span>Confirm the fix from the complaint, or reopen it.</span>
+                      </li>
+                    </ul>
+                    <p className="aside-card__note">
+                      The list refreshes automatically every few seconds while a report
+                      is active.
+                    </p>
+                  </section>
+                )}
+              </aside>
+            ) : null}
           </div>
         </div>
       </main>
 
       <footer className="site-footer">
         <div className="container site-footer__inner">
-          <span>HostelDesk</span>
+          <span className="site-footer__brand">HostelDesk</span>
           <span>Student complaint desk</span>
         </div>
       </footer>

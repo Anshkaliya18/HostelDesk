@@ -10,7 +10,16 @@ export default function Header({ profile, onSignOut }) {
           </span>
           <span className="brand__name">HostelDesk</span>
         </div>
-        <span className="brand__context">{profile?.name ? `Student portal · ${profile.name}` : 'Student portal'} {onSignOut && <button type="button" className="student-signout" onClick={onSignOut}>Sign out</button>}</span>
+        <div className="header-actions">
+          <span className="header-role">
+            {profile?.name ? `Student portal · ${profile.name}` : 'Student portal'}
+          </span>
+          {onSignOut ? (
+            <button type="button" className="header-signout" onClick={onSignOut}>
+              Sign out
+            </button>
+          ) : null}
+        </div>
       </div>
     </header>
   )

@@ -246,76 +246,78 @@ export default function ComplaintForm({ onSuccess, accessToken, autoFocusDescrip
             ) : null}
           </div>
 
-          <div className="field">
-            <label className="field__label" htmlFor="block">
-              Block
-              <span className="required-mark" aria-hidden="true">
-                *
-              </span>
-            </label>
-            <p className="field__hint" id="block-hint">
-              The block letter so we can route the complaint correctly.
-            </p>
-            <input
-              ref={blockRef}
-              className={`input${errors.block ? ' control--error' : ''}`}
-              id="block"
-              name="block"
-              type="text"
-              maxLength={BLOCK_MAX_LENGTH}
-              placeholder="A"
-              value={block}
-              required
-              autoComplete="off"
-              list="block-suggestions"
-              aria-invalid={Boolean(errors.block)}
-              aria-describedby={blockDescribedBy}
-              onChange={handleBlockChange}
-              onBlur={() => handleBlur('block')}
-            />
-            <datalist id="block-suggestions">
-              {['A', 'B', 'C', 'D', 'E', 'F'].map(letter => <option key={letter} value={letter} />)}
-            </datalist>
-            {errors.block ? (
-              <p className="field-error" id="block-error">
-                <AlertIcon size={15} />
-                <span>{errors.block}</span>
+          <div className="field-row">
+            <div className="field">
+              <label className="field__label" htmlFor="block">
+                Block
+                <span className="required-mark" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <p className="field__hint" id="block-hint">
+                The block letter so we can route the complaint correctly.
               </p>
-            ) : null}
-          </div>
+              <input
+                ref={blockRef}
+                className={`input${errors.block ? ' control--error' : ''}`}
+                id="block"
+                name="block"
+                type="text"
+                maxLength={BLOCK_MAX_LENGTH}
+                placeholder="A"
+                value={block}
+                required
+                autoComplete="off"
+                list="block-suggestions"
+                aria-invalid={Boolean(errors.block)}
+                aria-describedby={blockDescribedBy}
+                onChange={handleBlockChange}
+                onBlur={() => handleBlur('block')}
+              />
+              <datalist id="block-suggestions">
+                {['A', 'B', 'C', 'D', 'E', 'F'].map(letter => <option key={letter} value={letter} />)}
+              </datalist>
+              {errors.block ? (
+                <p className="field-error" id="block-error">
+                  <AlertIcon size={15} />
+                  <span>{errors.block}</span>
+                </p>
+              ) : null}
+            </div>
 
-          <div className="field">
-            <label className="field__label" htmlFor="room">
-              Room
-              <span className="required-mark" aria-hidden="true">
-                *
-              </span>
-            </label>
-            <p className="field__hint" id="room-hint">
-              The room number inside that block.
-            </p>
-            <input
-              ref={roomRef}
-              className={`input${errors.room ? ' control--error' : ''}`}
-              id="room"
-              name="room"
-              type="text"
-              maxLength={ROOM_MAX_LENGTH}
-              placeholder="204"
-              value={room}
-              required
-              autoComplete="off"
-              aria-invalid={Boolean(errors.room)}
-              aria-describedby={roomDescribedBy}
-              onChange={handleRoomChange}
-              onBlur={() => handleBlur('room')}
-            />
-            {errors.room ? (
-              <p className="field-error" id="room-error">
-                <AlertIcon size={15} />
-                <span>{errors.room}</span>
+            <div className="field">
+              <label className="field__label" htmlFor="room">
+                Room
+                <span className="required-mark" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <p className="field__hint" id="room-hint">
+                The room number inside that block.
               </p>
-            ) : null}
+              <input
+                ref={roomRef}
+                className={`input${errors.room ? ' control--error' : ''}`}
+                id="room"
+                name="room"
+                type="text"
+                maxLength={ROOM_MAX_LENGTH}
+                placeholder="204"
+                value={room}
+                required
+                autoComplete="off"
+                aria-invalid={Boolean(errors.room)}
+                aria-describedby={roomDescribedBy}
+                onChange={handleRoomChange}
+                onBlur={() => handleBlur('room')}
+              />
+              {errors.room ? (
+                <p className="field-error" id="room-error">
+                  <AlertIcon size={15} />
+                  <span>{errors.room}</span>
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <PhotoUpload
