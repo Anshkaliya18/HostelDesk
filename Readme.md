@@ -11,16 +11,25 @@
 | **API Docs (Swagger)** | [hosteldesk-qgx8.onrender.com/docs](https://hosteldesk-qgx8.onrender.com/docs) | Live |
 | **Database & Auth & Storage** | Supabase (PostgreSQL + Auth + private Storage bucket) | Live |
 
+> These URLs are recorded from the repository's deployment configuration. They were not re-verified with live requests during this documentation pass — before a review session, confirm both services are awake (the Render free tier can sleep; the first request may take ~50 seconds, the frontend shows a cold-start notice while it waits).
+
 ---
+
+## The problem
+
+Hostel maintenance usually runs on paper registers and WhatsApp threads:
+complaints get lost, nobody can see what is pending or repeatedly breaking,
+and students rarely hear back. HostelDesk replaces that with one accountable,
+trackable complaint loop.
 
 ## What it does
 
 HostelDesk turns a hostel complaint **photo + one-line note** into a structured, trackable maintenance task:
 
-1. A **Student** uploads a photo of the problem (broken fan, leaking tap·) with a short note
+1. A **Student** uploads a photo of the problem (broken fan, leaking tap) with a short note
 2. **AI** analyzes the photo + text and suggests a **category**, **severity**, and **worker type**
-3. The **Warden** reviews the AI recommendation, edits if needed, and approves → a task is created .
-4. The assigned **Worker** picks up the task, marks it in-progress, completes it with a note .
+3. The **Warden** reviews the AI recommendation, edits if needed, and approves → a task is created.
+4. The assigned **Worker** picks up the task, marks it in-progress, completes it with a note.
 5. The **Student** sees live status updates end-to-end
 
 The warden also gets **repeat-problem alerts** and a **daily digest** — no AI required for those, just deterministic rules.
@@ -58,11 +67,25 @@ The warden also gets **repeat-problem alerts** and a **daily digest** — no AI 
 - Worker and Warden portals load as separate frontend chunks and share the portal stylesheet
 
 ### AI Engine (Gemini 2.5, server-side only)
-- Default model `gemini-2.5-flash` with `gemini-2.5-flash-lite` fallback (thinking budget disabled, strict JSON response schema; Gemma 4 remains a one-line config swap)
+- Primary model `gemini-2.5-flash` with an automatic `gemini-2.5-flash-lite` fallback (thinking budget disabled, strict JSON response schema). The retry/fallback policy is unit-tested — see [Current Implementation Notes](#current-implementation-notes).
 - Categories: **Electrical · Plumbing · Cleaning · Furniture**
 - Severity: **Low · Medium · High**
 - Worker suggestions: **Electrician · Plumber · Cleaner · Carpenter**
 - Graceful fallback: if AI is unavailable, the complaint lands directly in `WARDEN_REVIEW` for manual categorization — the flow never blocks
+
+---
+
+## Repeat-problem detection & alert resolution
+
+Detection is **deterministic, not AI**: HostelDesk identifies recurring maintenance patterns from complaint history using configurable rules. The default rule raises one active alert per (block, category) when at least **3 complaints** for the same block and category are recorded within a **7-day window** (`REPEAT_PROBLEM_THRESHOLD` / `REPEAT_PROBLEM_WINDOW_DAYS` env-overridable).
+
+Evaluation runs when complaint data changes — immediately after a successful AI classification at submission, and again when the warden finalizes a review. It does **not** run continuously in the background, and the system does not train or learn from the queue.
+
+Alert lifecycle:
+- The warden explicitly resolves an alert from Reports → **"Mark resolved"** (with a confirmation). The resolution timestamp is set server-side; opening or reviewing a complaint never resolves anything.
+- Active and resolved alerts are listed separately in the Reports card.
+- Resolving records a workflow state — it is not, by itself, proof that the underlying physical problem was repaired.
+- If the pattern recurs after resolution, a fresh alert is raised under the same rule (tests cover this re-detection path).
 
 ---
 
@@ -75,22 +98,22 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 ---
 
 ## Architecture
-.
+
 ```text
-              https://hosteldesk.aurio.workers.dev
-              Student  ·  Warden  ·  Worker (React SPA)
-                            ” HTTPS
-                            –
-              https://hosteldesk-qgx8.onrender.com
-              FastAPI (auth, complaints, tasks, digest)
-               ”            ”              ”
-               –            –              –
-      Supabase Auth   Supabase Postgres   Gemini API (2.5 Flash)
-      (email+token)   (RLS-protected)     (classification)
-               ”            ”
-               –            –
-      Private Storage  Alembic migrations
-      (complaint photos)
+          https://hosteldesk.aurio.workers.dev
+          Student  ·  Warden  ·  Worker (React SPA)
+                        |  HTTPS
+                        v
+          https://hosteldesk-qgx8.onrender.com
+          FastAPI (auth, complaints, tasks, alerts, digest)
+           |            |              |
+           v            v              v
+    Supabase Auth   Supabase Postgres   Gemini API (2.5 Flash)
+    (access tokens) (RLS-protected)     (classification)
+           |            |
+           v            v
+    Private Storage  Alembic migrations
+    (complaint photos)
 ```
 
 **Security model:**
@@ -112,7 +135,7 @@ SUBMITTED → AI_ANALYZED → WARDEN_REVIEW → ASSIGNED → IN_PROGRESS → COM
 | Storage | Supabase Storage — private `complaint-photos` bucket |
 | AI | Gemini API (server-side REST, env-configurable model — `gemini-2.5-flash` in production) |
 | Hosting | Cloudflare Workers (frontend static assets) · Render (backend) |
-| Tests | pytest — 113 backend tests |
+| Tests | pytest — backend suite (verified count in [Tests](#tests)) |
 
 ---
 
@@ -135,9 +158,9 @@ Suggested demo walkthrough (one complaint, all three roles):
 6. Warden → Reports        → repeat-problem alerts, hotspots, daily digest + "Copy digest"
 ```
 
-> Tip: open the three roles in separate browser tabs/incognito windows for the smoothest demo..
+> Tip: open the three roles in separate browser tabs/incognito windows for the smoothest demo.
 
-**Demo accounts on the live site** (also usable by judges):
+**Demo accounts on the live site** (shared intentionally for review):
 
 | Role | Email | Password |
 | --- | --- | --- |
@@ -145,11 +168,13 @@ Suggested demo walkthrough (one complaint, all three roles):
 | Warden | `demo.warden@hosteldesk.dev` | `DemoWarden2026!` |
 | Worker | `demo.worker@hosteldesk.dev` | `DemoWorker2026!` |
 
+These are real accounts in the live Supabase Auth project — they sign in through exactly the same server-verified token path as any other account. Warden/Worker signups on your own deployment additionally require the staff invite code configured server-side (see [Environment Variables](#environment-variables)).
+
 ---
 
 ## Screenshots (from the live deployment)
 
-### Student portal .
+### Student portal
 
 | Login | Complaint submitted with photo |
 | --- | --- |
@@ -182,27 +207,26 @@ Suggested demo walkthrough (one complaint, all three roles):
 ---
 
 ## Project Structure
-.
+
 ```text
 HostelDesk/
-”
-””·”· frontend/            # React app (all three role portals)
-”   ””·”· src/pages/       #   Student / Warden / Worker screens
-”   ””·”· src/services/    #   Supabase + API clients
-”   ””·”· wrangler.jsonc   #   Cloudflare Workers static-assets deploy
-”   ”””·”· .env.example     #   Vite build-time environment template
-”
-””·”· backend/             # FastAPI service
-”   ””·”· app/             #   routes, services, schemas, db, core
-”   ””·”· alembic/         #   DB migrations (incl. RLS policy migration)
-”   ””·”· tests/           #   113 pytest tests
-”   ””·”· seed.py          #   demo data seeder (empty-DB seeding)
-”   ””·”· scripts/seed_demo.py   # judge-ready demo dataset + photos (see below)
-”   ”””·”· .env.example     #   full backend environment template
-”
-””·”· docs/screenshots/    # live-deployment screenshots used above
-””·”· Readme.md            # this file
-”””·”· LICENSE              # MIT
+├── frontend/            # React app (all three role portals)
+│   ├── src/pages/       #   Student / Warden / Worker screens
+│   ├── src/services/    #   Supabase + API clients
+│   ├── wrangler.jsonc   #   Cloudflare Workers static-assets deploy
+│   └── .env.example     #   Vite build-time environment template
+├── backend/             # FastAPI service
+│   ├── app/             #   routes, services, schemas, db, core
+│   ├── alembic/         #   DB migrations (incl. RLS policy migration)
+│   ├── tests/           #   pytest suite (see "Tests")
+│   ├── seed.py          #   demo data seeder (empty-DB seeding)
+│   ├── scripts/seed_demo.py   # judge-ready demo dataset + photos (demo_assets/)
+│   └── .env.example     #   full backend environment template
+├── docs/
+│   ├── JUDGE_NOTES.md   # reviewer orientation and stress-testing notes
+│   └── screenshots/     # live-deployment screenshots used above
+├── Readme.md            # this file
+└── LICENSE              # MIT
 ```
 
 ---
@@ -233,7 +257,7 @@ Swagger UI: <http://127.0.0.1:8000/docs>
 
 > Without `GEMINI_API_KEY` or Supabase keys the app still runs: AI is skipped (complaints go straight to warden review) and photos fall back to the local `uploads/` folder.
 
-### 2. Frontend (Vite) :
+### 2. Frontend (Vite)
 
 ```bash
 cd frontend
@@ -308,7 +332,9 @@ cd backend
 python -m pytest -q
 ```
 
-118 tests cover AI readiness (including malformed output, duplicate-check prompts, the Gemini 2.5 request shape), complaint validation & ownership, role-based auth, staff invite codes, rate limits, the student confirm/reopen loop, warden dashboard/filters (including block + needs-review), worker task ownership, the warden review gate, repeat-problem alerts (incl. submission-time detection and the explicit warden resolve lifecycle), digest + severity-based SLA, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
+`python -m pytest -q` from `backend/` discovers and runs **118 tests; all 118 passed on the latest run against this tree** (SQLite-backed hermetic suite, no network). They cover AI readiness (including malformed output, duplicate-check prompts, the Gemini 2.5 request shape, and the retry/fallback policy), complaint validation & ownership, role-based auth, staff invite codes, rate limits, the student confirm/reopen loop, warden dashboard/filters (including block + needs-review), worker task ownership, the warden review gate, repeat-problem alerts (incl. submission-time detection, the explicit warden resolve lifecycle, and re-detection after resolution), digest + severity-based SLA, safe handling of invalid AI output, storage (validation, safe filenames, signed URLs), FK integrity, and Alembic upgrade/downgrade reproducibility.
+
+The frontend has no unit-test suite; quality gates are `npm run lint` (ESLint) and `npm run build` (Vite production build).
 
 ---
 
@@ -333,11 +359,25 @@ This repo was built with separate workstream branches, now merged into `main`:
 
 ---
 
+## Current Implementation Notes
+
+This is the authoritative description of what runs today, kept in sync with the source.
+
+- **AI model:** `gemini-2.5-flash` primary with automatic `gemini-2.5-flash-lite` fallback, called server-side through the Generative Language REST API. The tight policy (one retry per model; 4xx errors move straight to the fallback; max 4 model requests per complaint) is unit-tested. An **earlier Gemma 4 experiment returned HTTP 500** with our AI-Studio key and was abandoned — it is historical only; the model stays env-configurable (`GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL`).
+- **Recurrence detection is rule-based, not learning:** deterministic threshold/window rules over complaint history (3+ complaints, same block + category, 7-day window by default). The system does not train itself or continuously learn from the queue.
+- **Human approval:** AI only writes an advisory recommendation row. Every assignment requires an explicit warden review; AI-analysis records are never modified during review.
+- **Authentication:** Supabase Auth with server-verified access tokens and role-based authorization. Reviewer demo accounts are real Supabase Auth accounts on the same sign-in path.
+- **Repeat alerts:** explicit warden-only resolution with a server-set `resolved_at` timestamp; active and resolved alerts are listed separately; recurrence after resolution raises a fresh alert.
+- **Digest:** generated on demand for a selected UTC date — it is not scheduled, emailed, or pushed. Optional AI polish rewords only the summary text; counters stay deterministic.
+- **Known MVP limitations:** in-memory rate limits and digest-summary cache (single backend instance), no push/email notification layer, single-hostel tenancy, and AI coverage limited to the 4 maintenance trades (anything else falls through to manual warden categorization).
+
+---
+
 ## For judges
 
 **The one-sentence version:** HostelDesk is an AI-assisted hostel complaint desk where **the AI suggests and people decide** — a warden explicitly approves every assignment, a student explicitly confirms every fix.
 
-**Model:** the backend calls Google's **Gemini 2.5 Flash** through the server-side Generative Language REST API, with `gemini-2.5-flash-lite` as an automatic fallback. Thinking budget is disabled and the reply is forced to a strict JSON schema, so classification is fast and structurally validated. Gemma-only deployments remain a one-line config swap (`GEMINI_MODEL`) once API-side Gemma 4 access is available.
+**Model:** the backend calls Google's **Gemini 2.5 Flash** through the server-side Generative Language REST API, with `gemini-2.5-flash-lite` as an automatic fallback. Thinking budget is disabled and the reply is forced to a strict JSON schema, so classification is fast and structurally validated. The retry/fallback behavior is unit-tested (`backend/tests/test_ai.py`). An earlier Gemma 4 experiment returned HTTP 500 with our AI-Studio key and was abandoned; the model remains env-configurable (`GEMINI_MODEL`). `GET /health/ai` reports the live configuration without exposing any secret.
 
 **"AI suggests, people decide" is enforced in code, not copy:**
 - The AI only ever writes a *recommendation row* (category / severity / trade / reason / confidence / possible duplicate). It cannot assign workers, change ownership, or close complaints.

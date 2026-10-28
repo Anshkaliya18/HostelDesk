@@ -12,6 +12,8 @@ Live site: <https://hosteldesk.aurio.workers.dev> · API: <https://hosteldesk-qg
 | Warden | `demo.warden@hosteldesk.dev` | `DemoWarden2026!` |
 | Worker | `demo.worker@hosteldesk.dev` | `DemoWorker2026!` |
 
+These are real accounts in the live Supabase Auth project — they sign in through the same server-verified token path as any other account, with passwords shared intentionally for review. HostelDesk uses Supabase Auth with server-verified access tokens and role-based authorization; students see only their own complaints, workers only their assigned tasks, and wardens the review/reporting views.
+
 ## Why AI, and why only as a suggestion?
 
 Hostel complaints arrive as one photo plus a one-line, often ambiguous note
@@ -85,7 +87,17 @@ WhatsApp-ready plain text), but we kept the core in one place we can test.
 - **Warden reports:** choose a UTC report date, inspect deterministic daily
   counts in a fixed Activity / Queue / Patterns summary, then review new
   reports by category, delayed reviews, overdue tasks, and 30-day hotspots.
-  Copy or download the digest as a clearly sectioned text report.
+  Copy or download the digest as a clearly sectioned text report. The digest
+  is generated **on demand** for the selected UTC date — nothing is scheduled,
+  emailed, or pushed.
+- **Repeat alerts:** deterministic rule-based detection (3+ complaints, same
+  block + category, 7-day window by default), evaluated when complaints are
+  classified and when the warden finalizes a review — not in the background.
+  The Reports card lists **Active** and **Resolved** alerts separately, and
+  the warden resolves an alert explicitly ("Mark resolved" with a
+  confirmation; server-set timestamp). Resolving records workflow state — it
+  does not by itself prove the physical problem was repaired, and a genuine
+  recurrence afterwards raises a fresh alert.
 - **Worker dashboard:** open, to-start, completed, and all-task filters;
   assignment counts; task detail/history; and a required completion note.
   Warden and Worker pages share a lazily loaded portal stylesheet so direct
@@ -124,9 +136,10 @@ addressable through the server-side Generative Language API, and the code
 adapts its request shape per family (strict JSON `responseSchema` +
 disabled thinking budget for Gemini 2.5; free-form JSON text for Gemma-style
 models). Google does not currently expose Gemma 4 through usable AI-Studio
-keys, so the shippable default is **Gemini 2.5 Flash** with
-`gemini-2.5-flash-lite` fallback; the day Gemma 4 is API-addressable, the
-swap is `GEMINI_MODEL=gemma-4-31b-it` plus one deployment restart.
+keys (our earlier attempt returned HTTP 500 and was abandoned), so the
+shippable default is **Gemini 2.5 Flash** with `gemini-2.5-flash-lite`
+fallback. If a Gemma-class model ever becomes addressable, switching is still
+just `GEMINI_MODEL=gemma-4-31b-it` plus one deployment restart.
 
 The docs (screen deck and older files) may still mention Gemma 4; the
 authoritative, always-current statement of what actually runs is this file

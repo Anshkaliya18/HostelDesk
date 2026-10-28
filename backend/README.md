@@ -2,9 +2,9 @@
 
 FastAPI backend for the AI-assisted hostel complaint and task desk.
 
-**Central rule: AI suggests; the Warden decides.** Gemma/Gemini only classifies
-a complaint (category / severity / suggested worker type); it never assigns a
-worker. The warden's review creates the task.
+**Central rule: AI suggests; the Warden decides.** The AI (Gemini 2.5 Flash by
+default) only classifies a complaint (category / severity / suggested worker
+type); it never assigns a worker. The warden's review creates the task.
 
 ## Stack
 
@@ -15,7 +15,7 @@ httpx (Gemini REST) · pytest
 ```text
 React → FastAPI → SQLAlchemy → Supabase PostgreSQL
 FastAPI → Supabase Storage (private bucket)
-FastAPI → Gemma/Gemini (server-side only)
+FastAPI → Gemini 2.5 (server-side only)
 ```
 
 ## Quick start
@@ -136,7 +136,8 @@ put a real code in source control, screenshots, or public docs.
 | PATCH | `/complaints/{id}/review` | warden | final category/severity/worker + warden note → creates task |
 | GET | `/tasks/my` | worker | only their assigned tasks |
 | PATCH | `/tasks/{id}/status` | worker | ASSIGNED → IN_PROGRESS → COMPLETED (+ note) |
-| GET | `/alerts` | warden | active repeat-problem alerts (deterministic rule) |
+| GET | `/alerts` | warden | repeat-problem alerts; `?status=active\|resolved\|all` (default `active`) |
+| POST | `/alerts/{id}/resolve` | warden | explicitly mark a repeat-problem alert resolved (server-set timestamp) |
 | GET | `/digest` | warden | deterministic daily counts with an optional AI-polished Activity / Queue / Patterns summary |
 
 Photos are uploaded once at complaint-creation time, stored privately under
@@ -161,13 +162,16 @@ three-line rules-based summary when AI polish is unavailable.
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-74 tests cover AI readiness, complaint validation including separate block/room
-fields, student ownership, Warden auth and single-request signup, Warden
-dashboard/workers/filters,
-worker task ownership, the warden review gate, worker completion, the
-repeat-problem rule, the digest, safe handling of invalid Gemini output,
-storage (validation, safe filenames, fake Supabase client, signed URLs),
-FK integrity, and Alembic upgrade/downgrade reproducibility.
+The pytest suite (run with `.\.venv\Scripts\python.exe -m pytest -q`) covers AI
+readiness incl. the retry/fallback policy, complaint validation including
+separate block/room fields, student ownership, Warden auth and single-request
+signup, Warden dashboard/workers/filters, worker task ownership, the warden
+review gate, worker completion, the repeat-problem rule and its explicit
+warden resolve lifecycle (authorization, double-resolve, re-detection after
+resolution), the digest, safe handling of invalid Gemini output, storage
+(validation, safe filenames, fake Supabase client, signed URLs), FK integrity,
+and Alembic upgrade/downgrade reproducibility. The verified count is kept in
+the root README's Tests section to avoid drift between documents.
 
 ## Notes / MVP limitations
 
