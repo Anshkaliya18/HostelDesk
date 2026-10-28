@@ -28,6 +28,7 @@ const DEMO_ROLES = [
 export default function DemoSwitcher({ currentEmail }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
 
   if (!currentEmail) return null
   const normalized = currentEmail.trim().toLowerCase()
@@ -50,6 +51,7 @@ export default function DemoSwitcher({ currentEmail }) {
       setError(err.message || 'Could not switch role.')
     } finally {
       setBusy(false)
+      setIsOpen(false)
     }
   }
 
@@ -57,16 +59,31 @@ export default function DemoSwitcher({ currentEmail }) {
 
   return (
     <div className="demo-switcher" role="region" aria-label="Switch demo role">
-      <button type="button" className="demo-switcher__toggle" aria-expanded="false">Switch role</button>
-      <div className="demo-switcher__panel">
-        <p className="demo-switcher__note">Demo account: {currentEmail}</p>
-        {others.map(r => (
-          <button key={r.key} type="button" className={`demo-switcher__role${busy ? ' disabled' : ''}`} disabled={busy} onClick={() => switchTo(r.key)}>
-            {busy ? 'Switching…' : `Try as ${r.label}`}
-          </button>
-        ))}
-        {error && <p className="demo-switcher__error" role="alert">{error}</p>}
-      </div>
+      <button
+        type="button"
+        className="demo-switcher__toggle"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        Switch role
+      </button>
+      {isOpen && (
+        <div className="demo-switcher__panel">
+          <p className="demo-switcher__note">Demo account: {currentEmail}</p>
+          {others.map(r => (
+            <button
+              key={r.key}
+              type="button"
+              className={`demo-switcher__role${busy ? ' disabled' : ''}`}
+              disabled={busy}
+              onClick={() => switchTo(r.key)}
+            >
+              {busy ? 'Switching…' : `Try as ${r.label}`}
+            </button>
+          ))}
+          {error && <p className="demo-switcher__error" role="alert">{error}</p>}
+        </div>
+      )}
     </div>
   )
 }
